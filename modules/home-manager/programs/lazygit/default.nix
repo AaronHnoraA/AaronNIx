@@ -1,16 +1,8 @@
 { ... }:
 {
-  # Install lazygit via home-manager module
-  programs.lazygit = {
-    enable = true;
+  # 用 Home Manager 装 lazygit
+  programs.lazygit.enable = true;
 
-    settings = {
-      git = {
-        pager = {
-          colorArg = "always";
-          pager = "delta --color-only --dark --paging=never";
-        };
-      };
-    };
-  };
+  # 从当前目录读取 config.yml，并放到标准位置
+  xdg.configFile."lazygit/config.yml".source = ./config.yml;
 }

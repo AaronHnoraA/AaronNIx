@@ -1,0 +1,67 @@
+gui:
+  theme: # catppuccin palette of course
+    activeBorderColor:
+      - "#f9e2af"
+      - bold
+    inactiveBorderColor:
+      - "#a6adc8"
+    optionsTextColor:
+      - "#89b4fa"
+    selectedLineBgColor:
+      - "#313244"
+    cherryPickedCommitBgColor:
+      - "#45475a"
+    cherryPickedCommitFgColor:
+      - "#89dceb"
+    unstagedChangesColor:
+      - "#f38ba8"
+    defaultFgColor:
+      - "#cdd6f4"
+    searchingActiveBorderColor:
+      - "#f9e2af"
+  # stuff relating to the UI
+  scrollHeight: 2 # how many lines you scroll by
+  scrollPastBottom: true # enable scrolling past the bottom
+  sidePanelWidth: 0.3333 # number from 0 to 1
+  expandFocusedSidePanel: false
+  mainPanelSplitMode: "flexible" # one of 'horizontal' | 'flexible' | 'vertical'
+
+  commitLength:
+    show: true
+  mouseEvents: true
+  skipUnstageLineWarning: false
+  skipStashWarning: true
+  showFileTree: false # for rendering changes files in a tree format
+  showRandomTip: true
+  showCommandLog: true
+  commandLogSize: 8
+  authorColors:
+    "*": "#b4befe"
+  showBottomLine: false
+  border: single
+  nerdFontsVersion: "3"
+  spiner:
+    frames:
+      - ⣾
+      - ⣽
+      - ⣻
+      - ⢿
+      - ⡿
+      - ⣟
+      - ⣯
+      - ⣷
+
+confirmOnQuit: true
+os:
+  editPreset: "nvim-remote"
+promptToReturnFromSubprocess: false
+keybinding:
+  # universal:
+  #   quit: Q
+  commits:
+    moveDownCommit: <c-x>
+    moveUpCommit: <c-w>
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never
