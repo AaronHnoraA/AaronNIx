@@ -53,7 +53,7 @@
             ;
           name = "hc";
         };
-        nabokikh = {
+        hc = {
           avatar = ./files/avatar;
           wallpaper = ./files/wallpaper.jpg;
           email = "1216713811@qq.com";
