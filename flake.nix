@@ -1,19 +1,125 @@
 {
-  description = "AaronHC";
-
+  description = "NixOS and nix-darwin configs for my machines";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    nix-darwin.url = "github:LnL7/nix-darwin";
-  };
+    # Nixpkgs
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.11";
 
-	outputs = { self, nix-darwin, nixpkgs, ... }@inputs: {
-    darwinConfigurations."AaronHC" = nix-darwin.lib.darwinSystem {
-      system = "aarch64-darwin";
-      modules = [
-        # 这里导入之前我们使用的 configuration.nix，
-        # 这样旧的配置文件仍然能生效
-        ./darwin-configuration.nix
-      ];
+    # Home manager
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # NixOS profiles to optimize settings for different hardware
+    hardware.url = "github:nixos/nixos-hardware";
+
+    # Global catppuccin theme
+    catppuccin.url = "github:catppuccin/nix";
+
+    # Noctalia Shell
+    noctalia = {
+      url = "github:noctalia-dev/noctalia-shell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Nix Darwin (for MacOS machines)
+    darwin = {
+      url = "github:LnL7/nix-darwin";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
+
+  outputs =
+    {
+      self,
+      catppuccin,
+      darwin,
+      home-manager,
+      nixpkgs,
+      ...
+    }@inputs:
+    let
+      inherit (self) outputs;
+
+      # Define user configurations
+      users = {
+        "alexander.nabokikh" = {
+          inherit (users.nabokikh)
+            avatar
+            email
+            fullName
+            gitKey
+            ;
+          name = "alexander.nabokikh";
+        };
+        nabokikh = {
+          avatar = ./files/avatar;
+          wallpaper = ./files/wallpaper.jpg;
+          email = "alexander.nabokikh@olx.pl";
+          fullName = "Alexander Nabokikh";
+          gitKey = "C5810093";
+          name = "nabokikh";
+        };
+      };
+
+      # Function for NixOS system configuration
+      mkNixosConfiguration =
+        hostname: username:
+        nixpkgs.lib.nixosSystem {
+          specialArgs = {
+            inherit inputs outputs hostname;
+            userConfig = users.${username};
+            nixosModules = "${self}/modules/nixos";
+          };
+          modules = [ ./hosts/${hostname} ];
+        };
+
+      # Function for nix-darwin system configuration
+      mkDarwinConfiguration =
+        hostname: username:
+        darwin.lib.darwinSystem {
+          system = "aarch64-darwin";
+          specialArgs = {
+            inherit inputs outputs hostname;
+            userConfig = users.${username};
+            darwinModules = "${self}/modules/darwin";
+          };
+          modules = [ ./hosts/${hostname} ];
+        };
+
+      # Function for Home Manager configuration
+      mkHomeConfiguration =
+        system: username: hostname:
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = import nixpkgs { inherit system; };
+          extraSpecialArgs = {
+            inherit inputs outputs;
+            userConfig = users.${username};
+            nhModules = "${self}/modules/home-manager";
+          };
+          modules = [
+            ./home/${username}/${hostname}
+            catppuccin.homeModules.catppuccin
+          ];
+        };
+    in
+    {
+      nixosConfigurations = {
+        energy = mkNixosConfiguration "energy" "nabokikh";
+      };
+
+      darwinConfigurations = {
+        "PL-OLX-KCGXHGK3PY" = mkDarwinConfiguration "PL-OLX-KCGXHGK3PY" "alexander.nabokikh";
+      };
+
+      homeConfigurations = {
+        "alexander.nabokikh@PL-OLX-KCGXHGK3PY" =
+          mkHomeConfiguration "aarch64-darwin" "alexander.nabokikh"
+            "PL-OLX-KCGXHGK3PY";
+        "nabokikh@energy" = mkHomeConfiguration "x86_64-linux" "nabokikh" "energy";
+      };
+
+      overlays = import ./overlays { inherit inputs; };
+    };
 }
