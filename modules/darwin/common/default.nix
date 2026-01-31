@@ -232,4 +232,7 @@
   fonts.packages = with pkgs; [
     nerd-fonts.meslo-lg
   ];
+  imports = [
+    #./brew
+  ];
 }

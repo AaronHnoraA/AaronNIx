@@ -170,7 +170,8 @@ alias tkss="tmux kill-session -t"
 alias ta="tmux attach -t"
 alias ts="tmux new-session -s"
 
-eval $(thefuck --alias)
+eval "$(pay-respects zsh --alias)" 
+alias fuck="pay-respects"
 
 export PATH="$PATH:/opt/homebrew/opt/llvm/bin"
 

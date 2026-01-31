@@ -28,6 +28,18 @@
       url = "github:LnL7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+    # Optional: Declarative tap management
+    homebrew-core = {
+      url = "github:homebrew/homebrew-core";
+      flake = false;
+    };
+    homebrew-cask = {
+      url = "github:homebrew/homebrew-cask";
+      flake = false;
+    };
+
   };
 
   outputs =
@@ -58,7 +70,7 @@
           wallpaper = ./files/wallpaper.jpg;
           email = "1216713811@qq.com";
           fullName = "Chang He Aaron";
-          gitKey = "C5810093";
+          #gitKey = "C5810093";
           name = "hc";
         };
       };

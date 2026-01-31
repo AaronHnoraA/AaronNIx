@@ -2,7 +2,7 @@
 {
   # 1. 安装需要的包
   home.packages = with pkgs; [
-    zsh-powerlevel10k eza bat fzf zoxide thefuck fastfetch fortune
+    zsh-powerlevel10k eza bat fzf zoxide pay-respects fastfetch fortune
   ];
 
   # 2. 把你的配置文件链接到 ~/.config/zsh/my_zshrc

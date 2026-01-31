@@ -10,10 +10,17 @@
       };
       pull.rebase = "true";
     };
+    
+    # --- 修改开始 ---
+    # 方法1：完全删除 signing 块（最彻底）
+    # signing = { ... }; 
+    
+    # 方法2：显式禁用（推荐，逻辑清晰）
     signing = {
-      key = userConfig.gitKey;
-      signByDefault = true;
+      key = null; # 或者 userConfig.gitKey，如果不签名，key 设不设都无所谓
+      signByDefault = false; 
     };
+    # --- 修改结束 ---
   };
 
   programs.delta = {
