@@ -233,6 +233,6 @@
     nerd-fonts.meslo-lg
   ];
   imports = [
-    #./brew
+    ./brew
   ];
 }
