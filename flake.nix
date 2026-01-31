@@ -51,7 +51,7 @@
             fullName
             gitKey
             ;
-          name = "Aaron.hc";
+          name = "hc";
         };
         nabokikh = {
           avatar = ./files/avatar;

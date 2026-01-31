@@ -187,13 +187,21 @@
         _FXSortFoldersFirst = true;
       };
       dock = {
-        autohide = true;
-        expose-animation-duration = 0.15;
-        show-recents = false;
-        showhidden = true;
-        persistent-apps = [ ];
-        tilesize = 30;
-        wvous-bl-corner = 1;
+        autohide = true;                 # 自动隐藏 Dock
+        expose-animation-duration = 0.15;# Mission Control 动画时间
+        show-recents = false;            # 不显示“最近使用的应用”
+        showhidden = true;               # 隐藏的应用图标半透明
+        persistent-apps = [
+        {app = "/Applications/Brave Browser.app";}
+        {app = "/Applications/kitty.app";}
+        {app = "/Applications/TradingView.app";}
+        {app = "/Applications/MarginNote 4.app";}
+        {app = "/Applications/Zotero.app";}
+        {app = "/System/Applications/Music.app";}
+        {app = "/Applications/Joplin.app";}
+        ];           # 固定在 Dock 里的应用列表
+        tilesize = 100;                   # Dock 图标大小
+        wvous-bl-corner = 1;             # 热角（左下角）动作
         wvous-br-corner = 1;
         wvous-tl-corner = 1;
         wvous-tr-corner = 1;
