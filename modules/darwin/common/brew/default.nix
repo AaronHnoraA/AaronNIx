@@ -27,13 +27,15 @@
     
     taps = [ 
       "homebrew/services" 
+      "railwaycat/emacsmacport"
     ];
     brews = [ 
       "wget"
     ];
     casks = [];
   };
-  imports = {
+
+  imports = [
     ./emacs
-  };
+  ];
 }
