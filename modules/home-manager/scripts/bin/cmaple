@@ -1,0 +1,23 @@
+#!/bin/bash
+
+MAPLE_PATH="/Library/Frameworks/Maple.framework/Versions/2024/bin.APPLE_ARM64_MACOS"
+EXECUTABLE="cmaple"
+
+# 检查目录是否存在
+if [ ! -d "$MAPLE_PATH" ]; then
+    echo "Error: Directory $MAPLE_PATH does not exist."
+    exit 1
+fi
+
+# 切换到目标目录
+cd "$MAPLE_PATH" || { echo "Failed to change directory to $MAPLE_PATH"; exit 1; }
+
+# 检查可执行文件是否存在
+if [ ! -x "$EXECUTABLE" ]; then
+    echo "Error: $EXECUTABLE is not found or not executable."
+    exit 1
+fi
+
+# 运行 cmaple 并传递所有参数
+./"$EXECUTABLE" "$@"
+

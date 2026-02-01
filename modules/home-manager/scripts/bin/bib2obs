@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# 在当前目录及子目录查找所有以 .bib 结尾的文件，并一次性传给脚本
+find . -type f -name '*.bib' -exec ~/.bin/bib2obs.py {} +

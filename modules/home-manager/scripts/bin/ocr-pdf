@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 配置
+LANGS="chi_sim+eng"
+JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+
+[[ -z "${1:-}" ]] && { echo "用法: $0 input.pdf"; exit 1; }
+
+IN="$1"
+[[ ! -f "$IN" ]] && { echo "错误: 找不到文件 $IN"; exit 1; }
+
+# 临时文件处理
+OUT_TMP="${IN%.pdf}.tmp_ocr.pdf"
+
+echo "🚀 正在处理: $IN (中英双语 + 强制覆盖模式)"
+
+# ocrmypdf 参数说明:
+# --force-ocr: 强制开启 OCR，即使检测到文字层也会重新处理（常开模式）
+# --deskew: 自动纠偏，对扫描件非常有用
+# --clean: 在 OCR 前清理扫描图像的噪点
+# --optimize 1: 压缩 PDF 资源，通常能显著减小体积
+if ocrmypdf \
+    -l "$LANGS" \
+    --force-ocr \
+    --deskew \
+    --clean \
+    --optimize 1 \
+    --jobs "$JOBS" \
+    "$IN" "$OUT_TMP"; then
+
+    # 成功后直接原子替换原文件
+    mv -f "$OUT_TMP" "$IN"
+    
+    echo "✅ 处理成功: $IN 已被覆盖更新。"
+    echo "💡 原有的矢量图层已被保留作为背景，新增了中英文字层。"
+else
+    echo "❌ 处理过程中出错，原文件未动。"
+    [[ -f "$OUT_TMP" ]] && rm -f "$OUT_TMP"
+    exit 1
+fi

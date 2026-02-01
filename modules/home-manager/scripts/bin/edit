@@ -1,0 +1,90 @@
+#!/bin/zsh
+local sock="/tmp/nvim.sock"
+local tex_aux_exts=(
+  aux  log  toc  out  fls  fdb_latexmk
+  'synctex(\.gz)?'     # synctex & synctex.gz
+  blg  bbl  'run\.xml' # run.xml
+  bcf  xdv  nav  snm   lof  lot  vrb 'mtc[0-9]*' bbl-SAVE-ERROR
+  maf ptc sty
+)
+
+if [[ "$1" == "--help" ]]; then
+  echo "用法: edit [FILE]"
+  echo
+  echo "edit                 使用 fzf 选择文件打开"
+  echo "edit FILE            直接打开指定文件"
+  echo "edit --clean         删除 LaTeX 中间文件"
+  echo "edit --build FILE    编译 tex 文件（支持编译器选择）"
+  echo "edit --bug           显示所有 .log 错误尾部"
+  return 0
+fi
+
+if [[ $1 == --clean ]]; then
+  echo "🧹 清理 LaTeX 中间文件..."
+
+  # ① 把数组元素拼成 (aux|log|…|maf)
+  joined=$(IFS='|'; printf '%s' "${tex_aux_exts[*]}")
+
+  # ② BSD find (-E 开启扩展正则)：
+  #    -regex 要匹配整条路径，所以前缀 '.*\.'，后缀 '$'
+  find -E . -type f -regex ".*\\.(${joined})\$" -print -delete
+
+  echo "✅ 清理完成"
+  return 0
+fi
+
+if [[ "$1" == "--build" ]]; then
+  local target="$2"
+  if [[ -z "$target" ]]; then
+    echo "❌ 请提供要编译的 .tex 文件"
+    return 1
+  fi
+
+  # 选择编译器
+  local compiler=$(printf "pdflatex\nxelatex\nlualatex" | fzf --prompt="选择编译器: ")
+  [ -z "$compiler" ] && echo "❌ 未选择编译器。" && return 1
+
+  echo "🔧 使用 $compiler 编译 $target ..."
+  latexmk -pdf -interaction=nonstopmode -pdflatex="$compiler" "$target"
+  echo "✅ 编译完成"
+  return 0
+fi
+
+if [[ "$1" == "--bug" ]]; then
+  echo "🐛 查找 .log 文件错误..."
+  find . -type f -name "*.log" | while read -r log; do
+    echo "──── $log ────"
+    tail -n 20 "$log"
+    echo
+  done
+  return 0
+fi
+
+if [ -e "$sock" ]; then
+  if lsof "$sock" >/dev/null 2>&1; then
+    echo "⚠️ Neovim 正在运行。强制关闭？(y/[n])"
+    read confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+      rm -f "$sock"
+    else
+      echo "❌ 取消操作。"
+      return 1
+    fi
+  else
+    rm -f "$sock"
+  fi
+fi
+
+local file="$1"
+if [ -z "$file" ]; then
+  file=$(find . -type f \( \
+    -name "*.tex" -o -name "*.cls" -o -name "*.bib" -o -name "*.sty" -o \
+    -name "*.md" -o -name "*.txt" -o -name "*.py" -o -name "*.cfg" -o -name "*.json" \
+  \) | fzf --prompt="选择文件: " \
+          --preview 'head -n 30 {} || echo "[无法预览]"' \
+          --preview-window=right:60%)
+  [ -z "$file" ] && echo "❌ 未选择任何文件。" && return 1
+fi
+
+echo "🚀 启动 Neovim: $file"
+nvim --listen "$sock" "$file"

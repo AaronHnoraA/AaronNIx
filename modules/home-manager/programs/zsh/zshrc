@@ -163,7 +163,6 @@ alias VIM="sudo vim"
 alias vim="nvim"
 alias neovim="nvim"
 
-export PATH="$PATH:/Users/hc/.bin"
 
 alias tl="tmux list-sessions"
 alias tkss="tmux kill-session -t"
