@@ -15,7 +15,7 @@
   programs.zsh = {
     enable = true;
     # 在生成的 .zshrc 最后一行加上：
-    initExtra = ''
+    initContent = ''
       source ~/.config/zsh/my_zshrc
     '';
   };

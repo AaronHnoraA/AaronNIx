@@ -1,6 +1,0 @@
-# -*- mode: snippet -*-
-# name: Superset Equal
-# key: sup=
-# --
-\supseteq `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

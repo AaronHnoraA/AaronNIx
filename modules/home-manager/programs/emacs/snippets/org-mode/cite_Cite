@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: Cite
-# key: cite
-# -- Add a cite
-# --
-\cite{$1}$0 `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

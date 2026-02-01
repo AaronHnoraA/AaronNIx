@@ -1,9 +1,0 @@
-# -*- mode: snippet -*-
-# name: \begin{}…\end{}
-# key: begin
-# -- Begin - End
-# --
-\\begin{${1:env}}
-$2
-\\end{${1:env}} `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

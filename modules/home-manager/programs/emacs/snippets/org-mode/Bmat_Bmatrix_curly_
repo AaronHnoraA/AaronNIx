@@ -1,8 +1,0 @@
-# -*- mode: snippet -*-
-# name: Bmatrix (curly)
-# key: Bmat
-# --
-\begin{Bmatrix}
-$1
-\end{Bmatrix} `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`
