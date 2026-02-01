@@ -30,8 +30,9 @@
     ];
     brews = [ 
       "wget"
+    ];
+    casks = [
       "aerospace"
     ];
-    casks = [];
   };
 }

@@ -141,6 +141,7 @@
           isShowPreferences = 0;
           numberOfSecondForAutoHide = 5;
         };
+        NSGlobalDomain."com.apple.mouse.linear" = false;
         "-g".NSUserKeyEquivalents = {
           "Lock Screen" = "@^l";
           "Paste and Match Style" = "^$v";
@@ -204,7 +205,7 @@
         wvous-tr-corner = 1;
       };
       screencapture = {
-        location = "/Users/${userConfig.name}/Downloads/temp";
+        location = "/Users/${userConfig.name}/Downloads/";
         type = "png";
         disable-shadow = true;
       };
