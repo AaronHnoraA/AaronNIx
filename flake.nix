@@ -40,6 +40,8 @@
       flake = false;
     };
 
+    emacs-overlay.url = "github:nix-community/emacs-overlay";
+
   };
 
   outputs =
