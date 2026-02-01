@@ -134,9 +134,6 @@
             "Zoom Out" = "^-";
           };
         };
-        "com.caldis.Mos" = {
-          hideStatusItem = true;
-        };
         "com.dwarvesv.minimalbar" = {
           areSeparatorsHidden = 1;
           isAutoHide = 1;
@@ -144,7 +141,6 @@
           isShowPreferences = 0;
           numberOfSecondForAutoHide = 5;
         };
-        NSGlobalDomain."com.apple.mouse.linear" = true;
         "-g".NSUserKeyEquivalents = {
           "Lock Screen" = "@^l";
           "Paste and Match Style" = "^$v";
