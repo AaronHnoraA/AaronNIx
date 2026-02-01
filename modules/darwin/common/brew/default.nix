@@ -10,7 +10,7 @@
   nix-homebrew = {
     enable = true;
     enableRosetta = true; # M1/M2/M3 必需
-    user = "你的用户名";   # 或者使用 config.users.primaryUser 动态获取
+    user = "hc";   # 或者使用 config.users.primaryUser 动态获取
     autoMigrate = true;   # 接管现有的 brew
     
     # 可选：配置 taps 的所有权，防止权限问题
@@ -25,8 +25,15 @@
       upgrade = true;
     };
     
-    taps = [ "homebrew/services" ];
-    brews = [ "wget" ];
-    casks = [ "google-chrome" ];
+    taps = [ 
+      "homebrew/services" 
+    ];
+    brews = [ 
+      "wget"
+    ];
+    casks = [];
+  };
+  imports = {
+    ./emacs
   };
 }
