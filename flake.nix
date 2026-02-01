@@ -50,6 +50,7 @@
       catppuccin,
       darwin,
       home-manager,
+      emacs-overlay,
       nixpkgs,
       ...
     }@inputs:
@@ -106,7 +107,14 @@
       mkHomeConfiguration =
         system: username: hostname:
         home-manager.lib.homeManagerConfiguration {
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import nixpkgs { 
+            inherit system; 
+            overlays = [ 
+                    emacs-overlay.overlays.default 
+                  ];
+      # 如果需要允许非自由软件（如某些字体或驱动），建议也加上这个
+            config.allowUnfree = true;
+          };
           extraSpecialArgs = {
             inherit inputs outputs;
             userConfig = users.${username};

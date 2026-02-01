@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: Jupyter:Raw
-# key: jraw
-# --
-# %% [code]
-%%raw
-${1:raw}

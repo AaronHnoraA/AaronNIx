@@ -7,7 +7,6 @@
 {
   imports = [
     ../programs/aerospace
-    ../programs/alacritty
     ../programs/albert
     ../programs/atuin
     ../programs/bat

@@ -1,6 +1,0 @@
-# -*- mode: snippet -*-
-# name: Fraction
-# key: frac
-# --
-\frac{$1}{$2}$3 `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

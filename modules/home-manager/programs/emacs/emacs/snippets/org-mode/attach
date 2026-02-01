@@ -1,6 +1,0 @@
-# -*- mode: snippet -*-
-# name: img
-# key: img
-# --
-[[file:/Users/van/org/org-roam/图片附件/]] `(when (and (not (eobp)) (looking-at "
-")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

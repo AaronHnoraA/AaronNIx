@@ -16,18 +16,30 @@
   };
 
   # 链接你的配置文件
-  xdg.configFile = {
-    "emacs" = {
-      source = ./emacs; # 确保你的 flake 目录下有 emacs 文件夹
-      recursive = true; # 递归链接，防止只链接目录导致只读问题
-    };
-  };
+  home.activation.cloneEmacsConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
+    # 定义目标目录 (注意：XDG 标准是 ~/.config/emacs)
+    TARGET_DIR="$HOME/.config/emacs"
+    REPO_URL="http://git.nas/Config/Emacs.git"
+
+    # 检查目录是否存在
+    if [ ! -d "$TARGET_DIR" ]; then
+      echo "Emacs config not found, cloning from $REPO_URL..."
+      # 使用 $DRY_RUN_CMD 确保在 home-manager build --dry-run 时不执行
+      $DRY_RUN_CMD ${pkgs.git}/bin/git clone "$REPO_URL" "$TARGET_DIR"
+    else
+      echo "Emacs config already exists at $TARGET_DIR. Skipping clone."
+      # 可选：如果你希望每次 switch 都自动 pull 更新，可以解开下面注释
+      # echo "Updating Emacs config..."
+      $DRY_RUN_CMD cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull
+    fi
+  '';
 
   # 必要的外部依赖
   home.packages = with pkgs; [ 
     git 
     ripgrep 
     fd 
+    fzf
     cmake   # vterm 编译通常需要
     libtool # 某些 native 模块编译需要
     pngpaste # Mac 上粘贴图片必备
