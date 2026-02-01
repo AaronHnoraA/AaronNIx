@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: Implied By
+# key: =<
+# --
+\impliedby `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

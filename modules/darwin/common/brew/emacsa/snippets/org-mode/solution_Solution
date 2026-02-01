@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Solution
+# key: solution
+# -- Add a remark
+# --
+\begin{solution}
+	$1
+\end{solution}
+$0 `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

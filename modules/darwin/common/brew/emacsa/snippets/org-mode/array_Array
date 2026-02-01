@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: Array
+# key: array
+# --
+\begin{array}
+$1
+\end{array} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`
