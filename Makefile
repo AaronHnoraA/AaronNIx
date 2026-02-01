@@ -41,7 +41,7 @@ nixos-rebuild:
 
 home-manager-switch:
 	@echo "Switching Home Manager configuration..."
-	@home-manager switch --flake $(HOME_TARGET)
+	@home-manager switch --flake ".#Aaron.hc@AaronMac"
 	@echo "Home Manager switch complete."
 
 nix-gc:
@@ -58,5 +58,8 @@ flake-check:
 	@echo "Checking flake..."
 	@nix flake check
 	@echo "Flake check complete."
+
+git:
+	@lazygit
 
 bootstrap-mac: install-nix install-nix-darwin

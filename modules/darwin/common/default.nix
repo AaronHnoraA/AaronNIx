@@ -172,14 +172,14 @@
         Clicking = true;
       };
       finder = {
-        AppleShowAllFiles = true;
+        AppleShowAllFiles = false;
         CreateDesktop = false;
         FXDefaultSearchScope = "SCcf";
         FXEnableExtensionChangeWarning = false;
         FXPreferredViewStyle = "Nlsv";
         QuitMenuItem = true;
         ShowPathbar = true;
-        ShowStatusBar = true;
+        ShowStatusBar = false;
         _FXShowPosixPathInTitle = true;
         _FXSortFoldersFirst = true;
       };
