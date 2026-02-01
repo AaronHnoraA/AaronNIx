@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Equation
+# key: equation
+# -- Add a Equation
+# --
+\begin{equation}
+	$0
+	\label{eq:$1}
+\end{equation} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

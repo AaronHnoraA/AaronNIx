@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: Region End
+# key: #endregion
+# -- Folding Region End
+# --
+%#Endregion `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

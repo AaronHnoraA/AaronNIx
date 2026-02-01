@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: Reference
+# key: ref
+# -- Add a Reference
+# --
+\ref{$1: $2}$0 `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: Pmatrix
+# key: pmat
+# --
+\begin{pmatrix}
+$1
+\end{pmatrix} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

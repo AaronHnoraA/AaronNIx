@@ -1,0 +1,9 @@
+# -*- mode: snippet -*-
+# name: Tabular (with label)
+# key: tabl
+# -- Tabular with label
+# --
+\begin{tabular}{${1:c}}\label{tab:$2}
+$0
+\end{tabular} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

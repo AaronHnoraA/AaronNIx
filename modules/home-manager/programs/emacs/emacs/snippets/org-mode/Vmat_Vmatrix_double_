@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: Vmatrix (double)
+# key: Vmat
+# --
+\begin{Vmatrix}
+$1
+\end{Vmatrix} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`

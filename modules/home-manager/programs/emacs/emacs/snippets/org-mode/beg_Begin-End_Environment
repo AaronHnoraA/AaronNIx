@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: Begin-End Environment
+# key: beg
+# --
+\begin{$1}
+$2
+\end{$1} `(when (and (not (eobp)) (looking-at "
+")) (let ((inhibit-modification-hooks t)) (ignore-errors (delete-char 1))))`
