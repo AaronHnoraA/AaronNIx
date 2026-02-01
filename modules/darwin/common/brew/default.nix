@@ -4,6 +4,7 @@
   # 因为我们在 flake.nix 里传递了 inputs，所以这里能读到
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
+    ./emacs
   ];
 
   # 2. 配置 nix-homebrew
@@ -34,8 +35,4 @@
     ];
     casks = [];
   };
-
-  imports = [
-    ./emacs
-  ];
 }
