@@ -30,6 +30,7 @@
     ];
     brews = [ 
       "wget"
+      "jupyter"
     ];
     casks = [
       "aerospace"
