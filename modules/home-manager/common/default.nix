@@ -17,6 +17,7 @@
     ../programs/fzf
     ../programs/git
     ../programs/go
+    ../programs/jupyter
     ../programs/gpg
     ../programs/k8s
     ../programs/lazygit
@@ -69,6 +70,7 @@
       python3
       ripgrep
       terraform
+      wmctrl
     ]
     ++ lib.optionals stdenv.isDarwin [
       anki-bin
