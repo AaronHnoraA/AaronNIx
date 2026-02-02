@@ -30,7 +30,7 @@
       echo "Emacs config already exists at $TARGET_DIR. Skipping clone."
       # 可选：如果你希望每次 switch 都自动 pull 更新，可以解开下面注释
       # echo "Updating Emacs config..."
-      $DRY_RUN_CMD cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull
+      #$DRY_RUN_CMD cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull
     fi
   '';
 
@@ -43,5 +43,6 @@
     cmake   # vterm 编译通常需要
     libtool # 某些 native 模块编译需要
     pngpaste # Mac 上粘贴图片必备
+    clang
   ];
 }

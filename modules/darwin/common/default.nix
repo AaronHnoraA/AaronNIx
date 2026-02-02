@@ -173,7 +173,7 @@
       };
       finder = {
         AppleShowAllFiles = false;
-        CreateDesktop = false;
+        CreateDesktop = true;
         FXDefaultSearchScope = "SCcf";
         FXEnableExtensionChangeWarning = false;
         FXPreferredViewStyle = "Nlsv";
