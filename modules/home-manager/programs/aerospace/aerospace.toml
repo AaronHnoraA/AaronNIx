@@ -265,91 +265,54 @@ X = 'secondary'
 Y = 'secondary'
 Z = 'secondary'
 
-[[on-window-detected]]
-if.app-id = 'com.doglobal.ESFileExplorer'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.finder'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.Terminal'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.ActivityMonitor'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.systempreferences'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.ScreenContinuity'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.Preview'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'net.kovidgoyal.kitty'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'org.localsend.localsendApp'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'eusoft.eudic.pro'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'info.sioyek.sioyek'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'net.cozic.joplin-desktop'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.Dictionary'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.pdfeditor.pdfeditormac'
-run = 'layout floating'
-[[on-window-detected]]
-if.app-id = 'com.apple.Safari'
-run = 'layout floating'
+
 
 [[on-window-detected]]
 if.app-id = 'com.apple.Music'
-run = 'move-node-to-workspace 0'
+run = ['move-node-to-workspace 0']
 [[on-window-detected]]
 if.app-id = 'com.bitwarden.desktop'
-run = 'move-node-to-workspace 0'
+run = ['move-node-to-workspace 0']
 [[on-window-detected]]
 if.app-id = 'us.zoom.xos'
-run = 'move-node-to-workspace 3'
+run = ['move-node-to-workspace 3']
 [[on-window-detected]]
 if.app-id = 'com.brave.Browser'
-run = 'move-node-to-workspace 4'
+if.window-title-regex-substring = 'Bitwarden'
+check-further-callbacks = true
+run = ['layout floating', 'move-node-to-workspace 4']
+[[on-window-detected]]
+if.app-id = 'com.brave.Browser'
+run = ['move-node-to-workspace 4']
 [[on-window-detected]]
 if.app-id = 'com.microsoft.rdc.macos'
-run = 'move-node-to-workspace 5'
+run = ['move-node-to-workspace 5']
 [[on-window-detected]]
 if.app-id = 'com.moonlight-stream.Moonlight'
-run = 'move-node-to-workspace 5'
+run = ['move-node-to-workspace 5']
 [[on-window-detected]]
 if.app-id = 'com.tradingview.tradingviewapp.desktop'
-run = 'move-node-to-workspace 6'
-[[on-window-detected]]
-if.app-id = 'org.mozilla.firefox'
-run = 'move-node-to-workspace 9'
-[[on-window-detected]]
-if.app-id = 'org.zotero.zotero-beta'
-run = 'move-node-to-workspace A'
+run = ['move-node-to-workspace 6']
 [[on-window-detected]]
 if.app-id = 'org.zotero.zotero'
-run = 'move-node-to-workspace A'
+if.window-title-regex-substring = '元数据检索'
+check-further-callbacks = true
+run = ['layout floating', 'move-node-to-workspace A']
+[[on-window-detected]]
+if.app-id = 'org.zotero.zotero'
+run = ['move-node-to-workspace A', 'join-with up']
 [[on-window-detected]]
 if.app-id = 'QReader.MarginStudy.easy'
-run = 'move-node-to-workspace A'
+run = ['move-node-to-workspace A', 'join-with down']
 [[on-window-detected]]
 if.app-id = 'org.gnu.Emacs'
-run = 'move-node-to-workspace C'
+run = ['move-node-to-workspace C']
 [[on-window-detected]]
 if.app-id = 'com.bardsoftware.ganttproject'
-run = 'move-node-to-workspace G'
+run = ['move-node-to-workspace G']
 
 
 
+[[on-window-detected]]
+check-further-callbacks = true  # 允许继续检查后续规则
+run = 'layout floating'  # 或使用 ignore()
