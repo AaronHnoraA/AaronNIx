@@ -4,19 +4,8 @@
   # 因为我们在 flake.nix 里传递了 inputs，所以这里能读到
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
-    ./conda
   ];
 
-  # 2. 配置 nix-homebrew
-  nix-homebrew = {
-    enable = true;
-    enableRosetta = true; # M1/M2/M3 必需
-    user = "hc";   # 或者使用 config.users.primaryUser 动态获取
-    autoMigrate = true;   # 接管现有的 brew
-    
-    # 可选：配置 taps 的所有权，防止权限问题
-    # mutableTaps = false; 
-  };
 
   # 3. 配置具体的包 (Homebrew 自身配置)
   homebrew = {
@@ -27,13 +16,22 @@
     };
     
     taps = [ 
-      "homebrew/services" 
     ];
     brews = [ 
-      "wget"
+      "aaanaconda"
     ];
     casks = [
-      "aerospace"
     ];
   };
+  # 在 homebrew 安装完成后执行
+  system.activationScripts.postUserActivation.text = ''
+    # 等待 conda 可用
+    if [ -f "/opt/homebrew/anaconda3/bin/conda" ]; then
+      echo "Setting up conda environments..."
+      # 初始化 conda
+      eval "$(/opt/homebrew/anaconda3/bin/conda shell.bash hook)"
+      echo "Conda setup complete"
+    fi
+  '';
+  # go to zsh config for setting up conda env
 }
