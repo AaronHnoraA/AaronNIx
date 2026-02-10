@@ -9,12 +9,9 @@
     taps = [ 
     ];
     brews = [ 
-      "mactex"
     ];
     casks = [
+      "mactex"
     ];
   };
-  home.sessionPath = [
-    "/Library/TeX/texbin"
-  ]
 }

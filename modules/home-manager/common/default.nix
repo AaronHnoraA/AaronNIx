@@ -17,7 +17,7 @@
     ../programs/fzf
     ../programs/git
     ../programs/go
-    #../programs/jupyter
+    ../programs/latex
     ../programs/gpg
     ../programs/k8s
     ../programs/lazygit
