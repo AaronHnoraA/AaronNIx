@@ -18,6 +18,7 @@ help:
 	@echo "  flake-update         - Update flake inputs"
 	@echo "  flake-check          - Check the flake for issues"
 	@echo "  bootstrap-mac        - Install Nix and nix-darwin sequentially"
+	@echo "  clean        - Free space"
 
 install-nix:
 	@echo "Installing Nix..."
@@ -61,5 +62,10 @@ flake-check:
 
 git:
 	@lazygit
+
+clean:
+	@echo "Cleaning ..."
+	@nix-collect-garbage -d && nix-store --optimise
+	@echo "Clean complete."
 
 bootstrap-mac: install-nix install-nix-darwin

@@ -156,9 +156,6 @@ alias :Q="exit"
 bindkey '^P' history-substring-search-up
 bindkey '^N' history-substring-search-down
 
-alias code="vs"
-alias chrome="/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome "
-
 alias VIM="sudo vim"
 alias vim="nvim"
 alias neovim="nvim"
@@ -172,16 +169,11 @@ alias ts="tmux new-session -s"
 eval "$(pay-respects zsh --alias)" 
 alias fuck="pay-respects"
 
-export PATH="$PATH:/opt/homebrew/opt/llvm/bin"
-
-export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/opt/homebrew/opt/llvm/lib"
 
 alias CMAKE="cmake -GNinja -DCMAKE_C_COMPILER=/opt/homebrew/bin/gcc-15 -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-15 " 
 
 
 
-
-alias nix-darwin="sudo darwin-rebuild --flake /Users/hc/.nixpkgs/.#AaronHC"
 export NIX_PATH="/Users/hc/.nixpkgs:/nix/var/nix/profiles/per-user/root/channels"
 
 eval "$(zoxide init --cmd cd zsh)"
@@ -223,11 +215,6 @@ function y() {
 	rm -f -- "$tmp"
 }
 
-alias config-nvim="yazi ~/.config/nvim/lua/"
-
-
-alias obsidian="cd ~/HC/Obsidian/"
-
 
 vterm_printf() {
     if [ -n "$TMUX" ] \
@@ -244,6 +231,8 @@ vterm_printf() {
 }
 
 alias org="yazi ~/.emacs.d/Org"
-
-
+alias config_nix="yazi ~/.nixpkgs/"
+alias config_emacs="yazi ~/.emacs.d/"
+alias e='emacsclient -c -a ""'   # GUI
+alias et='emacsclient -t -a ""'  # TTY
 

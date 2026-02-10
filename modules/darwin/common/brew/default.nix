@@ -5,6 +5,7 @@
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
     ./conda
+    ./mactex
   ];
 
   # 2. 配置 nix-homebrew
@@ -31,6 +32,9 @@
     ];
     brews = [ 
       "wget"
+      "vips"
+      "zoxide"
+      "trash-cli"
     ];
     casks = [
       "aerospace"
