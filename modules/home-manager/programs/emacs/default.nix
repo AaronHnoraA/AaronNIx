@@ -19,7 +19,7 @@
   home.activation.cloneEmacsConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
     # 定义目标目录 (注意：XDG 标准是 ~/.config/emacs)
     TARGET_DIR="$HOME/.config/emacs"
-    REPO_URL="http://git.nas/Config/Emacs.git"
+    REPO_URL="http://git.pwo101.top/Config/Emacs.git"
 
     # 检查目录是否存在
     if [ ! -d "$TARGET_DIR" ]; then

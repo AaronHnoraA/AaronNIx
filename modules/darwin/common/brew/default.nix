@@ -34,7 +34,7 @@
       "wget"
       "vips"
       "zoxide"
-      "trash-cli"
+      "trash"
     ];
     casks = [
       "aerospace"

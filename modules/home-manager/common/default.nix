@@ -73,9 +73,7 @@
       wmctrl
     ]
     ++ lib.optionals stdenv.isDarwin [
-      anki-bin
       colima
-      hidden-bar
       mos
       podman
       raycast

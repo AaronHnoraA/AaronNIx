@@ -133,11 +133,7 @@ source $ZSH/oh-my-zsh.sh
 alias zshconfig="vim ~/.zshrc"
 alias ohmyzsh"vim ~/.oh-my-zsh"
 
-alias rm="trash-put"
-alias undo-rm="trash-restore"
-alias rml="trash-list"
-alias rmc="trash-empty"
-alias total_rm="trash-rm"
+alias rm="trash"
 
 alias ls="eza"
 alias ll="eza -l"
