@@ -35,6 +35,8 @@
       "vips"
       "zoxide"
       "trash"
+      "jupytext"
+      "pandoc"
     ];
     casks = [
       "aerospace"

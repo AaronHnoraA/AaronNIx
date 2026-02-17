@@ -232,3 +232,4 @@ alias config_emacs="yazi ~/.emacs.d/"
 alias e='emacsclient -c -a ""'   # GUI
 alias et='emacsclient -t -a ""'  # TTY
 
+eval "$(direnv hook zsh)"
