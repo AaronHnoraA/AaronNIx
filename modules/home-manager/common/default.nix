@@ -11,7 +11,6 @@
     ../programs/albert
     ../programs/atuin
     ../programs/bat
-    ../programs/brave
     ../programs/btop
     ../programs/fastfetch
     ../programs/fzf

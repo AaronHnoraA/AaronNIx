@@ -3,28 +3,6 @@
 {
   programs.emacs = {
     enable = true;
-    # 使用 symlinkJoin 零编译包装
-    package = pkgs.symlinkJoin {
-      name = "emacs-wrapped";
-      # 依赖依然是直接拉取缓存的 Emacs
-      paths = [ (pkgs.emacs-git.override { withXwidgets = true; }) ];
-      nativeBuildInputs = [ pkgs.makeWrapper ];
-      
-      # postBuild 只在链接完成后执行，瞬间完成
-      postBuild = ''
-        wrapProgram $out/bin/emacs \
-          --set CC "${pkgs.gcc}/bin/gcc" \
-          --set CXX "${pkgs.gcc}/bin/g++" \
-          --prefix PATH ":" "${pkgs.lib.makeBinPath [ pkgs.gcc pkgs.gnumake pkgs.cmake ]}"
-          
-        if [ -f $out/bin/emacsclient ]; then
-          wrapProgram $out/bin/emacsclient \
-            --set CC "${pkgs.gcc}/bin/gcc" \
-            --set CXX "${pkgs.gcc}/bin/g++" \
-            --prefix PATH ":" "${pkgs.lib.makeBinPath [ pkgs.gcc pkgs.gnumake pkgs.cmake ]}"
-        fi
-      '';
-    };
     
     # 使用 emacs-git (对应 emacs-plus --HEAD)
     # Overlay 里的 emacs-git 默认已开启 native-comp

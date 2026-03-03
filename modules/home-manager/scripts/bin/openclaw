@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+PORT=18789
+LOCAL_URL="http://127.0.0.1:${PORT}"
+
+# 默认主机名 & 用户
+HOST_LOCAL="Aaron-nas"
+HOST_REMOTE="Aaron-nas-zerotier"
+
+# 解析参数
+HOST="$HOST_LOCAL"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --remote)
+      HOST="$HOST_REMOTE"
+      shift
+      ;;
+    *)
+      echo "未知参数: $1"
+      echo "用法: $0 [--remote]"
+      exit 1
+      ;;
+  esac
+done
+
+echo "🔓 开启 OpenClaw Gateway SSH 隧道..."
+echo "目标主机: ${HOST}"
+echo "本地访问地址: ${LOCAL_URL}"
+echo
+
+open "${LOCAL_URL}" >/dev/null 2>&1 &
+
+echo "按 Ctrl-C 结束隧道"
+
+ssh -N -L ${PORT}:127.0.0.1:${PORT} "${HOST}"

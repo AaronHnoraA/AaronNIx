@@ -37,6 +37,8 @@
       "trash"
       "jupytext"
       "pandoc"
+      "rust"
+      "rust-analyzer"
     ];
     casks = [
       "aerospace"

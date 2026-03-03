@@ -189,7 +189,7 @@
         show-recents = false;            # 不显示“最近使用的应用”
         showhidden = true;               # 隐藏的应用图标半透明
         persistent-apps = [
-        {app = "/Users/hc/Applications/Home Manager Apps/Brave Browser.app";}
+        {app = "/Applications/Brave Browser.app";}
         {app = "/Users/hc/Applications/Home Manager Apps/kitty.app";}
         {app = "/Users/hc/Applications/Home Manager Apps/Emacs.app";}
         {app = "/Applications/TradingView.app";}
@@ -197,6 +197,7 @@
         {app = "/Applications/Zotero.app";}
         {app = "/System/Applications/Music.app";}
         {app = "/Applications/Joplin.app";}
+        {app = "/Users/hc/Applications/Home Manager Apps/Telegram.app";}
         ];           # 固定在 Dock 里的应用列表
         tilesize = 100;                   # Dock 图标大小
         wvous-bl-corner = 1;             # 热角（左下角）动作

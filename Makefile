@@ -68,4 +68,5 @@ clean:
 	@nix-collect-garbage -d && nix-store --optimise
 	@echo "Clean complete."
 
+
 bootstrap-mac: install-nix install-nix-darwin
