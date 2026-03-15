@@ -134,23 +134,63 @@ local function project_root(bufnr, markers)
   return vim.fs.root(bufnr, markers) or (bufname ~= "" and vim.fs.dirname(bufname) or uv.cwd())
 end
 
+local function has_lsp_client(bufnr, method)
+  return #vim.lsp.get_clients({ bufnr = bufnr, method = method }) > 0
+end
+
+local function lsp_float_opts(focusable)
+  return {
+    border = "rounded",
+    max_width = 88,
+    focusable = focusable,
+    focus = false,
+    silent = true,
+    close_events = { "CursorMoved", "CursorMovedI", "BufHidden", "InsertEnter", "InsertLeave" },
+  }
+end
+
+local function open_cursor_popup(bufnr)
+  if vim.bo[bufnr].buftype ~= "" or vim.b[bufnr].large_file or vim.fn.mode() ~= "n" then
+    return
+  end
+
+  local diagnostics = vim.diagnostic.get(bufnr, { lnum = api.nvim_win_get_cursor(0)[1] - 1 })
+  if vim.g.auto_diagnostic_float and #diagnostics > 0 then
+    vim.diagnostic.open_float(nil, {
+      scope = "cursor",
+      border = "rounded",
+      focusable = false,
+      close_events = { "CursorMoved", "CursorMovedI", "BufHidden", "InsertEnter" },
+    })
+    return
+  end
+
+  if vim.g.auto_lsp_popup and has_lsp_client(bufnr, "textDocument/hover") then
+    pcall(vim.lsp.buf.hover, lsp_float_opts(false))
+  end
+end
+
+local function open_signature_popup(bufnr)
+  if not vim.g.auto_lsp_popup or vim.bo[bufnr].buftype ~= "" or vim.b[bufnr].large_file then
+    return
+  end
+
+  if vim.fn.mode() ~= "i" or vim.fn.pumvisible() == 1 or not has_lsp_client(bufnr, "textDocument/signatureHelp") then
+    return
+  end
+
+  pcall(vim.lsp.buf.signature_help, lsp_float_opts(false))
+end
+
 vim.g.autoformat = true
 vim.g.auto_diagnostic_float = true
+vim.g.auto_lsp_popup = true
 
 api.nvim_create_autocmd("ColorScheme", {
   group = augroup("transparent"),
   callback = set_transparent_background,
 })
 set_transparent_background()
-
-vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, {
-  border = "rounded",
-  max_width = 88,
-})
-vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, {
-  border = "rounded",
-  max_width = 88,
-})
 
 map("n", "<Esc>", "<cmd>nohlsearch<cr><Esc>", "Clear search highlight")
 map("n", "<leader>w", "<cmd>update<cr>", "Save file")
@@ -201,6 +241,10 @@ map("n", "<leader>ud", function()
   vim.g.auto_diagnostic_float = not vim.g.auto_diagnostic_float
   notify("diagnostic float " .. (vim.g.auto_diagnostic_float and "on" or "off"))
 end, "Toggle diagnostic float")
+map("n", "<leader>up", function()
+  vim.g.auto_lsp_popup = not vim.g.auto_lsp_popup
+  notify("lsp popup " .. (vim.g.auto_lsp_popup and "on" or "off"))
+end, "Toggle lsp popup")
 map("n", "<leader>uh", function()
   if not vim.lsp.inlay_hint then
     return
@@ -257,6 +301,14 @@ end, "Confirm completion", { expr = true })
 
 vim.diagnostic.config({
   severity_sort = true,
+  signs = {
+    text = {
+      [vim.diagnostic.severity.ERROR] = "E",
+      [vim.diagnostic.severity.WARN] = "W",
+      [vim.diagnostic.severity.INFO] = "I",
+      [vim.diagnostic.severity.HINT] = "H",
+    },
+  },
   underline = true,
   update_in_insert = false,
   virtual_text = {
@@ -268,15 +320,6 @@ vim.diagnostic.config({
     source = "if_many",
   },
 })
-
-for type, icon in pairs({
-  Error = "E",
-  Warn = "W",
-  Hint = "H",
-  Info = "I",
-}) do
-  vim.fn.sign_define("DiagnosticSign" .. type, { text = icon, texthl = "DiagnosticSign" .. type })
-end
 
 api.nvim_create_autocmd("TextYankPost", {
   group = augroup("yank"),
@@ -386,22 +429,16 @@ api.nvim_create_autocmd("VimResized", {
 })
 
 api.nvim_create_autocmd("CursorHold", {
-  group = augroup("diagnostic_float"),
+  group = augroup("cursor_popup"),
   callback = function(args)
-    if not vim.g.auto_diagnostic_float or vim.b[args.buf].large_file or vim.fn.mode() ~= "n" then
-      return
-    end
+    open_cursor_popup(args.buf)
+  end,
+})
 
-    local diagnostics = vim.diagnostic.get(args.buf, { lnum = vim.fn.line(".") - 1 })
-    if #diagnostics == 0 then
-      return
-    end
-
-    vim.diagnostic.open_float(nil, {
-      scope = "cursor",
-      focusable = false,
-      close_events = { "CursorMoved", "CursorMovedI", "BufHidden", "InsertEnter" },
-    })
+api.nvim_create_autocmd("CursorHoldI", {
+  group = augroup("signature_popup"),
+  callback = function(args)
+    open_signature_popup(args.buf)
   end,
 })
 
@@ -505,11 +542,17 @@ api.nvim_create_autocmd("LspAttach", {
     bufmap("n", "gD", vim.lsp.buf.declaration, "Goto declaration")
     bufmap("n", "gr", vim.lsp.buf.references, "List references")
     bufmap("n", "gi", vim.lsp.buf.implementation, "Goto implementation")
-    bufmap("n", "K", vim.lsp.buf.hover, "Hover")
-    bufmap("n", "<leader>lk", vim.lsp.buf.signature_help, "Signature help")
+    bufmap("n", "K", function()
+      vim.lsp.buf.hover(lsp_float_opts(true))
+    end, "Hover")
+    bufmap("n", "<leader>lk", function()
+      vim.lsp.buf.signature_help(lsp_float_opts(true))
+    end, "Signature help")
     bufmap("n", "<leader>rn", vim.lsp.buf.rename, "Rename symbol")
     bufmap({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, "Code action")
-    bufmap("i", "<C-k>", vim.lsp.buf.signature_help, "Signature help")
+    bufmap("i", "<C-k>", function()
+      vim.lsp.buf.signature_help(lsp_float_opts(true))
+    end, "Signature help")
 
     if vim.lsp.completion and client:supports_method("textDocument/completion") then
       vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
