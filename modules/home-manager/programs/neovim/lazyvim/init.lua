@@ -63,6 +63,8 @@ opt.grepformat = "%f:%l:%c:%m,%f:%l:%m"
 opt.laststatus = 3
 opt.showmode = false
 opt.confirm = true
+opt.list = false
+opt.listchars = { tab = "> ", trail = ".", nbsp = "+" }
 opt.fillchars:append({ eob = " " })
 opt.shortmess:append("c")
 opt.inccommand = "split"
@@ -87,6 +89,32 @@ local function augroup(name)
   return api.nvim_create_augroup("core_" .. name, { clear = true })
 end
 
+local function set_transparent_background()
+  for _, group in ipairs({
+    "Normal",
+    "NormalNC",
+    "NormalFloat",
+    "FloatBorder",
+    "SignColumn",
+    "FoldColumn",
+    "LineNr",
+    "CursorLineNr",
+    "EndOfBuffer",
+    "StatusLine",
+    "StatusLineNC",
+    "TabLineFill",
+    "Pmenu",
+    "WinSeparator",
+    "MsgArea",
+  }) do
+    local ok, hl = pcall(api.nvim_get_hl, 0, { name = group, link = false })
+    if ok then
+      hl.bg = "none"
+      api.nvim_set_hl(0, group, hl)
+    end
+  end
+end
+
 local function notify(message)
   vim.notify(message, vim.log.levels.INFO, { title = "nvim" })
 end
@@ -107,16 +135,39 @@ local function project_root(bufnr, markers)
 end
 
 vim.g.autoformat = true
+vim.g.auto_diagnostic_float = true
+
+api.nvim_create_autocmd("ColorScheme", {
+  group = augroup("transparent"),
+  callback = set_transparent_background,
+})
+set_transparent_background()
+
+vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, {
+  border = "rounded",
+  max_width = 88,
+})
+vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, {
+  border = "rounded",
+  max_width = 88,
+})
 
 map("n", "<Esc>", "<cmd>nohlsearch<cr><Esc>", "Clear search highlight")
 map("n", "<leader>w", "<cmd>update<cr>", "Save file")
 map("n", "<leader>q", "<cmd>quit<cr>", "Quit window")
 map("n", "<leader>bd", "<cmd>bdelete<cr>", "Delete buffer")
 map("n", "<leader>e", "<cmd>Explore<cr>", "File explorer")
+map("n", "<leader>tt", "<cmd>terminal<cr>", "Open terminal")
 map("n", "<leader>lf", function()
   vim.lsp.buf.format({ async = true })
 end, "Format buffer")
 map("n", "<leader>ld", vim.diagnostic.open_float, "Line diagnostics")
+map("n", "<leader>xl", function()
+  vim.diagnostic.setloclist({ open = true })
+end, "Buffer diagnostics")
+map("n", "<leader>xL", function()
+  vim.diagnostic.setqflist({ open = true })
+end, "Workspace diagnostics")
 map("n", "[d", function()
   vim.diagnostic.jump({ count = -1, float = true })
 end, "Previous diagnostic")
@@ -138,10 +189,18 @@ map("n", "<leader>us", function()
   vim.opt_local.spell = not vim.opt_local.spell:get()
   notify("spell " .. (vim.opt_local.spell:get() and "on" or "off"))
 end, "Toggle spell")
+map("n", "<leader>ul", function()
+  opt.list = not opt.list:get()
+  notify("listchars " .. (opt.list:get() and "on" or "off"))
+end, "Toggle listchars")
 map("n", "<leader>uf", function()
   vim.g.autoformat = not vim.g.autoformat
   notify("format on save " .. (vim.g.autoformat and "on" or "off"))
 end, "Toggle format on save")
+map("n", "<leader>ud", function()
+  vim.g.auto_diagnostic_float = not vim.g.auto_diagnostic_float
+  notify("diagnostic float " .. (vim.g.auto_diagnostic_float and "on" or "off"))
+end, "Toggle diagnostic float")
 map("n", "<leader>uh", function()
   if not vim.lsp.inlay_hint then
     return
@@ -171,6 +230,7 @@ map("v", "K", ":m '<-2<CR>gv=gv", "Move selection up")
 map("n", "<C-s>", "<cmd>update<cr>", "Save file")
 map("i", "<C-s>", "<C-o>:update<cr>", "Save file")
 map("v", "<C-s>", "<Esc><cmd>update<cr>gv", "Save file")
+map("t", "<Esc><Esc>", "<C-\\><C-n>", "Exit terminal mode")
 map("i", "<C-Space>", function()
   if vim.lsp.completion then
     vim.lsp.completion.get()
@@ -299,6 +359,16 @@ api.nvim_create_autocmd("FileType", {
   end,
 })
 
+api.nvim_create_autocmd("TermOpen", {
+  group = augroup("terminal"),
+  callback = function()
+    vim.opt_local.number = false
+    vim.opt_local.relativenumber = false
+    vim.opt_local.signcolumn = "no"
+    vim.cmd.startinsert()
+  end,
+})
+
 api.nvim_create_autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
   group = augroup("checktime"),
   callback = function()
@@ -312,6 +382,26 @@ api.nvim_create_autocmd("VimResized", {
   group = augroup("resize"),
   callback = function()
     vim.cmd("tabdo wincmd =")
+  end,
+})
+
+api.nvim_create_autocmd("CursorHold", {
+  group = augroup("diagnostic_float"),
+  callback = function(args)
+    if not vim.g.auto_diagnostic_float or vim.b[args.buf].large_file or vim.fn.mode() ~= "n" then
+      return
+    end
+
+    local diagnostics = vim.diagnostic.get(args.buf, { lnum = vim.fn.line(".") - 1 })
+    if #diagnostics == 0 then
+      return
+    end
+
+    vim.diagnostic.open_float(nil, {
+      scope = "cursor",
+      focusable = false,
+      close_events = { "CursorMoved", "CursorMovedI", "BufHidden", "InsertEnter" },
+    })
   end,
 })
 
@@ -416,8 +506,10 @@ api.nvim_create_autocmd("LspAttach", {
     bufmap("n", "gr", vim.lsp.buf.references, "List references")
     bufmap("n", "gi", vim.lsp.buf.implementation, "Goto implementation")
     bufmap("n", "K", vim.lsp.buf.hover, "Hover")
+    bufmap("n", "<leader>lk", vim.lsp.buf.signature_help, "Signature help")
     bufmap("n", "<leader>rn", vim.lsp.buf.rename, "Rename symbol")
     bufmap({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, "Code action")
+    bufmap("i", "<C-k>", vim.lsp.buf.signature_help, "Signature help")
 
     if vim.lsp.completion and client:supports_method("textDocument/completion") then
       vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
