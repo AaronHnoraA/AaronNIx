@@ -1,240 +1,453 @@
------------------------------------------------------------
--- 基础：leader / 插件管理（lazy.nvim）
------------------------------------------------------------
+if vim.loader then
+  vim.loader.enable()
+end
+
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- lazy.nvim 安装路径
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.uv and not vim.loop then
-  vim.uv = vim.loop
+for _, plugin in ipairs({
+  "2html_plugin",
+  "getscript",
+  "getscriptPlugin",
+  "gzip",
+  "logipat",
+  "rrhelper",
+  "spellfile_plugin",
+  "tar",
+  "tarPlugin",
+  "tutor_mode_plugin",
+  "zip",
+  "zipPlugin",
+}) do
+  vim.g["loaded_" .. plugin] = 1
 end
-if not vim.uv.fs_stat(lazypath) then
-  vim.fn.system({
-    "git", "clone", "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable",
-    lazypath,
-  })
+
+vim.g.netrw_banner = 0
+vim.g.netrw_liststyle = 3
+vim.g.netrw_altv = 1
+vim.g.netrw_winsize = 24
+
+local uv = vim.uv or vim.loop
+local api = vim.api
+local opt = vim.opt
+
+opt.number = true
+opt.relativenumber = true
+opt.mouse = "a"
+opt.clipboard = "unnamedplus"
+opt.expandtab = true
+opt.tabstop = 2
+opt.shiftwidth = 2
+opt.smartindent = true
+opt.breakindent = true
+opt.ignorecase = true
+opt.smartcase = true
+opt.incsearch = true
+opt.hlsearch = true
+opt.termguicolors = true
+opt.signcolumn = "yes"
+opt.cursorline = true
+opt.scrolloff = 6
+opt.sidescrolloff = 8
+opt.splitright = true
+opt.splitbelow = true
+opt.updatetime = 200
+opt.timeoutlen = 300
+opt.undofile = true
+opt.undodir = vim.fn.stdpath("state") .. "/undo"
+opt.completeopt = { "menuone", "noselect", "popup", "fuzzy" }
+opt.wildmode = { "longest", "full" }
+opt.wildoptions = "pum"
+opt.grepprg = "rg --vimgrep --smart-case --hidden"
+opt.grepformat = "%f:%l:%c:%m,%f:%l:%m"
+opt.laststatus = 3
+opt.showmode = false
+opt.confirm = true
+opt.fillchars:append({ eob = " " })
+opt.shortmess:append("c")
+opt.inccommand = "split"
+opt.winborder = "rounded"
+opt.statusline = table.concat({
+  " %f",
+  "%m%r%h%w",
+  "%=",
+  " %y",
+  " %l:%c",
+  " %p%% ",
+})
+
+vim.cmd.colorscheme("habamax")
+
+local function map(mode, lhs, rhs, desc, extra)
+  local opts = vim.tbl_extend("force", { silent = true, desc = desc }, extra or {})
+  vim.keymap.set(mode, lhs, rhs, opts)
 end
-vim.opt.rtp:prepend(lazypath)
 
------------------------------------------------------------
--- 基础选项
------------------------------------------------------------
-vim.opt.number = true
-vim.opt.relativenumber = true
-vim.opt.tabstop = 2
-vim.opt.shiftwidth = 2
-vim.opt.expandtab = true
-vim.opt.winblend = 0
-vim.opt.termguicolors = true
-vim.opt.signcolumn = "yes"
-vim.opt.winborder = "rounded"
+local function augroup(name)
+  return api.nvim_create_augroup("core_" .. name, { clear = true })
+end
 
--- 持久化 undo
-vim.opt.undofile = true
-vim.opt.undodir = vim.fn.stdpath("state") .. "/undo"
+local function notify(message)
+  vim.notify(message, vim.log.levels.INFO, { title = "nvim" })
+end
 
--- 系统剪贴板
-vim.opt.clipboard = "unnamedplus"
+local function is_large_file(bufnr)
+  local name = api.nvim_buf_get_name(bufnr)
+  if name == "" then
+    return false
+  end
 
--- 搜索小优化
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
-vim.opt.incsearch = true
-vim.opt.hlsearch = true
+  local stat = uv.fs_stat(name)
+  return stat and stat.size > 512 * 1024 or false
+end
 
--- 缩进展示
-vim.opt.smartindent = true
-vim.opt.breakindent = true
+local function project_root(bufnr, markers)
+  local bufname = api.nvim_buf_get_name(bufnr)
+  return vim.fs.root(bufnr, markers) or (bufname ~= "" and vim.fs.dirname(bufname) or uv.cwd())
+end
 
------------------------------------------------------------
--- 透明背景
------------------------------------------------------------
-local function set_transparent()
-  local groups = { "Normal", "NormalFloat", "SignColumn", "LineNr", "EndOfBuffer" }
-  for _, grp in ipairs(groups) do
-    vim.api.nvim_set_hl(0, grp, { bg = "none" })
+vim.g.autoformat = true
+
+map("n", "<Esc>", "<cmd>nohlsearch<cr><Esc>", "Clear search highlight")
+map("n", "<leader>w", "<cmd>update<cr>", "Save file")
+map("n", "<leader>q", "<cmd>quit<cr>", "Quit window")
+map("n", "<leader>bd", "<cmd>bdelete<cr>", "Delete buffer")
+map("n", "<leader>e", "<cmd>Explore<cr>", "File explorer")
+map("n", "<leader>lf", function()
+  vim.lsp.buf.format({ async = true })
+end, "Format buffer")
+map("n", "<leader>ld", vim.diagnostic.open_float, "Line diagnostics")
+map("n", "[d", function()
+  vim.diagnostic.jump({ count = -1, float = true })
+end, "Previous diagnostic")
+map("n", "]d", function()
+  vim.diagnostic.jump({ count = 1, float = true })
+end, "Next diagnostic")
+map("n", "[q", "<cmd>cprevious<cr>zz", "Previous quickfix")
+map("n", "]q", "<cmd>cnext<cr>zz", "Next quickfix")
+map("n", "<leader>xq", "<cmd>copen<cr>", "Open quickfix")
+map("n", "<leader>ur", function()
+  opt.relativenumber = not opt.relativenumber:get()
+  notify("relativenumber " .. (opt.relativenumber:get() and "on" or "off"))
+end, "Toggle relative number")
+map("n", "<leader>uw", function()
+  vim.opt_local.wrap = not vim.opt_local.wrap:get()
+  notify("wrap " .. (vim.opt_local.wrap:get() and "on" or "off"))
+end, "Toggle wrap")
+map("n", "<leader>us", function()
+  vim.opt_local.spell = not vim.opt_local.spell:get()
+  notify("spell " .. (vim.opt_local.spell:get() and "on" or "off"))
+end, "Toggle spell")
+map("n", "<leader>uf", function()
+  vim.g.autoformat = not vim.g.autoformat
+  notify("format on save " .. (vim.g.autoformat and "on" or "off"))
+end, "Toggle format on save")
+map("n", "<leader>uh", function()
+  if not vim.lsp.inlay_hint then
+    return
+  end
+
+  local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
+  vim.lsp.inlay_hint.enable(not enabled, { bufnr = 0 })
+  notify("inlay hints " .. (enabled and "off" or "on"))
+end, "Toggle inlay hints")
+map("n", "<C-h>", "<C-w>h", "Window left")
+map("n", "<C-j>", "<C-w>j", "Window down")
+map("n", "<C-k>", "<C-w>k", "Window up")
+map("n", "<C-l>", "<C-w>l", "Window right")
+map("n", "<C-Up>", "<cmd>resize +2<cr>", "Increase height")
+map("n", "<C-Down>", "<cmd>resize -2<cr>", "Decrease height")
+map("n", "<C-Left>", "<cmd>vertical resize -2<cr>", "Decrease width")
+map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", "Increase width")
+map("n", "<S-h>", "<cmd>bprevious<cr>", "Previous buffer")
+map("n", "<S-l>", "<cmd>bnext<cr>", "Next buffer")
+map("n", "n", "nzzzv", "Next search result")
+map("n", "N", "Nzzzv", "Previous search result")
+map("n", "<C-d>", "<C-d>zz", "Half page down")
+map("n", "<C-u>", "<C-u>zz", "Half page up")
+map("v", "J", ":m '>+1<CR>gv=gv", "Move selection down")
+map("v", "K", ":m '<-2<CR>gv=gv", "Move selection up")
+
+map("n", "<C-s>", "<cmd>update<cr>", "Save file")
+map("i", "<C-s>", "<C-o>:update<cr>", "Save file")
+map("v", "<C-s>", "<Esc><cmd>update<cr>gv", "Save file")
+map("i", "<C-Space>", function()
+  if vim.lsp.completion then
+    vim.lsp.completion.get()
+  end
+end, "Trigger completion")
+map("i", "<Tab>", function()
+  if vim.fn.pumvisible() == 1 then
+    return "<C-n>"
+  end
+  return "<Tab>"
+end, "Next completion item", { expr = true })
+map("i", "<S-Tab>", function()
+  if vim.fn.pumvisible() == 1 then
+    return "<C-p>"
+  end
+  return "<S-Tab>"
+end, "Previous completion item", { expr = true })
+map("i", "<CR>", function()
+  if vim.fn.pumvisible() == 1 then
+    return "<C-y>"
+  end
+  return "<CR>"
+end, "Confirm completion", { expr = true })
+
+vim.diagnostic.config({
+  severity_sort = true,
+  underline = true,
+  update_in_insert = false,
+  virtual_text = {
+    spacing = 2,
+    source = "if_many",
+  },
+  float = {
+    border = "rounded",
+    source = "if_many",
+  },
+})
+
+for type, icon in pairs({
+  Error = "E",
+  Warn = "W",
+  Hint = "H",
+  Info = "I",
+}) do
+  vim.fn.sign_define("DiagnosticSign" .. type, { text = icon, texthl = "DiagnosticSign" .. type })
+end
+
+api.nvim_create_autocmd("TextYankPost", {
+  group = augroup("yank"),
+  callback = function()
+    vim.highlight.on_yank({ higroup = "IncSearch", timeout = 180 })
+  end,
+})
+
+api.nvim_create_autocmd("BufReadPre", {
+  group = augroup("large_file"),
+  callback = function(args)
+    if is_large_file(args.buf) then
+      vim.b[args.buf].large_file = true
+    end
+  end,
+})
+
+api.nvim_create_autocmd("BufReadPost", {
+  group = augroup("last_cursor"),
+  callback = function(args)
+    local mark = api.nvim_buf_get_mark(args.buf, '"')
+    local line_count = api.nvim_buf_line_count(args.buf)
+    if mark[1] > 0 and mark[1] <= line_count then
+      pcall(api.nvim_win_set_cursor, 0, mark)
+    end
+  end,
+})
+
+api.nvim_create_autocmd("BufWritePre", {
+  group = augroup("save"),
+  callback = function(args)
+    if vim.bo[args.buf].buftype ~= "" then
+      return
+    end
+
+    local name = api.nvim_buf_get_name(args.buf)
+    if name ~= "" then
+      vim.fn.mkdir(vim.fn.fnamemodify(name, ":p:h"), "p")
+    end
+
+    if not vim.g.autoformat or vim.b[args.buf].autoformat == false or vim.b[args.buf].large_file then
+      return
+    end
+
+    if #vim.lsp.get_clients({ bufnr = args.buf, method = "textDocument/formatting" }) == 0 then
+      return
+    end
+
+    pcall(vim.lsp.buf.format, {
+      bufnr = args.buf,
+      async = false,
+      timeout_ms = 1200,
+    })
+  end,
+})
+
+api.nvim_create_autocmd("FileType", {
+  group = augroup("formatoptions"),
+  pattern = "*",
+  callback = function()
+    vim.opt_local.formatoptions:remove({ "c", "r", "o" })
+  end,
+})
+
+api.nvim_create_autocmd("FileType", {
+  group = augroup("text"),
+  pattern = { "gitcommit", "markdown", "text" },
+  callback = function()
+    vim.opt_local.wrap = true
+    vim.opt_local.spell = true
+  end,
+})
+
+api.nvim_create_autocmd("FileType", {
+  group = augroup("close_with_q"),
+  pattern = { "help", "man", "qf" },
+  callback = function(args)
+    vim.bo[args.buf].buflisted = false
+    map("n", "q", "<cmd>close<cr>", "Close window", { buffer = args.buf })
+  end,
+})
+
+api.nvim_create_autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
+  group = augroup("checktime"),
+  callback = function()
+    if vim.fn.mode() ~= "c" then
+      vim.cmd.checktime()
+    end
+  end,
+})
+
+api.nvim_create_autocmd("VimResized", {
+  group = augroup("resize"),
+  callback = function()
+    vim.cmd("tabdo wincmd =")
+  end,
+})
+
+local servers = {
+  lua_ls = {
+    cmd = { "lua-language-server" },
+    filetypes = { "lua" },
+    root_markers = { { ".luarc.json", ".luarc.jsonc" }, ".git" },
+    settings = {
+      Lua = {
+        diagnostics = { globals = { "vim" } },
+        workspace = { checkThirdParty = false },
+        telemetry = { enable = false },
+      },
+    },
+  },
+  clangd = {
+    cmd = { "clangd", "--background-index", "--header-insertion=never" },
+    filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
+    root_markers = { ".clangd", "compile_commands.json", "compile_flags.txt", ".git" },
+  },
+  gopls = {
+    cmd = { "gopls" },
+    filetypes = { "go", "gomod", "gowork", "gotmpl" },
+    root_markers = { "go.work", "go.mod", ".git" },
+  },
+  rust_analyzer = {
+    cmd = { "rust-analyzer" },
+    filetypes = { "rust" },
+    root_markers = { "Cargo.toml", "rust-project.json", ".git" },
+  },
+  pyright = {
+    cmd = { "pyright-langserver", "--stdio" },
+    filetypes = { "python" },
+    root_markers = {
+      "pyproject.toml",
+      "pyrightconfig.json",
+      "setup.py",
+      "setup.cfg",
+      "requirements.txt",
+      "Pipfile",
+      ".git",
+    },
+  },
+  ts_ls = {
+    cmd = { "typescript-language-server", "--stdio" },
+    filetypes = {
+      "javascript",
+      "javascriptreact",
+      "javascript.jsx",
+      "typescript",
+      "typescriptreact",
+      "typescript.tsx",
+    },
+    root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
+  },
+  bashls = {
+    cmd = { "bash-language-server", "start" },
+    filetypes = { "sh", "bash", "zsh" },
+    root_markers = { ".git" },
+  },
+  marksman = {
+    cmd = { "marksman", "server" },
+    filetypes = { "markdown" },
+    root_markers = { ".marksman.toml", ".git" },
+  },
+}
+
+for name, server in pairs(servers) do
+  if vim.fn.executable(server.cmd[1]) == 1 then
+    local config = vim.deepcopy(server)
+    config.root_dir = function(bufnr, on_dir)
+      if vim.bo[bufnr].buftype ~= "" or vim.b[bufnr].large_file then
+        return
+      end
+
+      on_dir(project_root(bufnr, server.root_markers))
+    end
+
+    vim.lsp.config(name, config)
+    vim.lsp.enable(name)
   end
 end
 
-vim.api.nvim_create_autocmd("ColorScheme", {
-  callback = set_transparent,
-})
-set_transparent()
-
------------------------------------------------------------
--- 打开文件自动跳回上次光标位置
------------------------------------------------------------
-vim.api.nvim_create_autocmd("BufReadPost", {
+api.nvim_create_autocmd("LspAttach", {
+  group = augroup("lsp_attach"),
   callback = function(args)
     local bufnr = args.buf
-    local mark = vim.api.nvim_buf_get_mark(bufnr, '"')
-    local lcount = vim.api.nvim_buf_line_count(bufnr)
-    if mark[1] > 0 and mark[1] <= lcount then
-      pcall(vim.api.nvim_win_set_cursor, 0, mark)
-    end
-  end,
-})
-
------------------------------------------------------------
--- 你的 LazyFile / LSP / 补全逻辑
------------------------------------------------------------
-vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
-  desc = "自定义事件LazyFile",
-  pattern = "*",
-  once = true,
-  callback = function()
-    if not vim.g._lazyfile_triggered then
-      vim.g._lazyfile_triggered = true
-      vim.schedule(function()
-        vim.api.nvim_exec_autocmds("User", { pattern = "LazyFile" })
-      end)
-    end
-  end,
-})
-
-vim.api.nvim_create_autocmd("User", {
-  pattern = "LazyFile",
-  callback = function()
-    -- 开启内置 LSP（假设你本机已装 lua-language-server / clangd）
-    vim.lsp.enable({ "lua_ls", "clangd" })
-
-    -- 诊断配置
-    vim.diagnostic.config({
-      virtual_text = true,
-      update_in_insert = true,
-      underline = true,
-      float = { border = "rounded" },
-    })
-
-    -- 诊断快捷键
-    vim.keymap.set("n", "<leader>d", vim.diagnostic.open_float, { desc = "diagnostic messages" })
-    vim.keymap.set("n", "[d", function()
-      vim.diagnostic.jump({ wrap = true, count = -1 })
-    end, { desc = "prev diagnostic" })
-    vim.keymap.set("n", "]d", function()
-      vim.diagnostic.jump({ wrap = true, count = 1 })
-    end, { desc = "next diagnostic" })
-
-    -- 格式化
-    vim.keymap.set("n", "<leader>lf", function()
-      vim.lsp.buf.format()
-    end, { desc = "format buffer" })
-
-    -- 保存快捷键
-    vim.keymap.set({ "n", "i" }, "<C-s>", "<cmd>w<cr>", { desc = "save file" })
-  end,
-})
-
--- LspAttach 时补全相关设置
-vim.api.nvim_create_autocmd("LspAttach", {
-  callback = function(args)
     local client = vim.lsp.get_client_by_id(args.data.client_id)
-    if client
-      and client:supports_method("textDocument/completion")
-      and vim.lsp.completion
+    if not client then
+      return
+    end
+
+    vim.bo[bufnr].omnifunc = "v:lua.vim.lsp.omnifunc"
+
+    local function bufmap(mode, lhs, rhs, desc)
+      map(mode, lhs, rhs, desc, { buffer = bufnr })
+    end
+
+    bufmap("n", "gd", vim.lsp.buf.definition, "Goto definition")
+    bufmap("n", "gD", vim.lsp.buf.declaration, "Goto declaration")
+    bufmap("n", "gr", vim.lsp.buf.references, "List references")
+    bufmap("n", "gi", vim.lsp.buf.implementation, "Goto implementation")
+    bufmap("n", "K", vim.lsp.buf.hover, "Hover")
+    bufmap("n", "<leader>rn", vim.lsp.buf.rename, "Rename symbol")
+    bufmap({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, "Code action")
+
+    if vim.lsp.completion and client:supports_method("textDocument/completion") then
+      vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
+    end
+
+    if vim.lsp.inlay_hint
+      and not vim.b[bufnr].large_file
+      and client:supports_method("textDocument/inlayHint")
     then
-      vim.opt.completeopt = { "menu", "menuone", "noinsert", "fuzzy", "popup" }
-      vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
-
-      vim.keymap.set("i", "<C-Space>", function()
-        vim.lsp.completion.get()
-      end, { desc = "completion" })
+      vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
     end
 
-    -----------------------------------------------------
-    -- 一些常用 LSP 快捷键（跳转/重命名/代码操作）
-    -----------------------------------------------------
-    local bufmap = function(mode, lhs, rhs, desc)
-      vim.keymap.set(mode, lhs, rhs, { buffer = args.buf, desc = desc })
+    if vim.b[bufnr].large_file or not client:supports_method("textDocument/documentHighlight") then
+      return
     end
 
-    bufmap("n", "gd", vim.lsp.buf.definition, "goto definition")
-    bufmap("n", "gD", vim.lsp.buf.declaration, "goto declaration")
-    bufmap("n", "gr", vim.lsp.buf.references, "references")
-    bufmap("n", "gi", vim.lsp.buf.implementation, "implementation")
-    bufmap("n", "K", vim.lsp.buf.hover, "hover doc")
-    bufmap("n", "<leader>rn", vim.lsp.buf.rename, "rename symbol")
-    bufmap({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, "code action")
+    local group = api.nvim_create_augroup("core_lsp_highlight_" .. bufnr, { clear = true })
+    api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
+      group = group,
+      buffer = bufnr,
+      callback = vim.lsp.buf.document_highlight,
+    })
+    api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "BufLeave" }, {
+      group = group,
+      buffer = bufnr,
+      callback = vim.lsp.buf.clear_references,
+    })
   end,
 })
 
------------------------------------------------------------
--- 一些简单的通用快捷键
------------------------------------------------------------
--- 快速清除搜索高亮
-vim.keymap.set("n", "<Esc>", "<cmd>noh<cr><Esc>", { desc = "clear highlights" })
-
--- 快速打开/关闭行号模式切换
-vim.keymap.set("n", "<leader>rn", function()
-  vim.opt.relativenumber = not vim.opt.relativenumber:get()
-end, { desc = "toggle relativenumber" })
-
--- 更舒服的窗口移动
-vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "window left" })
-vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "window down" })
-vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "window up" })
-vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "window right" })
-
------------------------------------------------------------
--- 插件：用 lazy.nvim 管理
------------------------------------------------------------
-require("lazy").setup({
-  -------------------------------------------------------
-  -- Treesitter 高亮
-  -------------------------------------------------------
-  {
-    "nvim-treesitter/nvim-treesitter",
-    build = ":TSUpdate",
-    lazy = false,  -- 官方建议不要懒加载 [web:39][web:42]
-    opts = {
-      ensure_installed = { "c", "cpp", "lua", "vim", "vimdoc", "markdown" },
-      highlight = { enable = true },
-      indent = { enable = true },
-    },
-    config = function(_, opts)
-      -- 可选：用 Treesitter 做折叠（不喜欢可以删掉）[web:36]
-      vim.opt.foldmethod = "expr"
-      vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
-      vim.opt.foldlevel = 99
-    end,
-  },
-
-  -------------------------------------------------------
-  -- 一个简单状态栏（lualine）
-  -------------------------------------------------------
-  {
-    "nvim-lualine/lualine.nvim",
-    dependencies = { "nvim-tree/nvim-web-devicons" },
-    opts = {
-      options = {
-        theme = "auto",
-        section_separators = "",
-        component_separators = "",
-      },
-    },
-    config = function(_, opts)
-      require("lualine").setup(opts)
-    end,
-  },
-
-  -------------------------------------------------------
-  -- 可选：一个简单的配色方案（支持透明）
-  -------------------------------------------------------
-  {
-    "folke/tokyonight.nvim",
-    lazy = false,
-    priority = 1000,
-    opts = {
-      style = "night",
-      transparent = true,  -- 和我们上面的透明函数配合 [web:30]
-    },
-    config = function(_, opts)
-      require("tokyonight").setup(opts)
-      vim.cmd.colorscheme("tokyonight")
-    end,
-  },
-})
-
+api.nvim_create_user_command("Format", function()
+  vim.lsp.buf.format({ async = true })
+end, { desc = "Format current buffer" })

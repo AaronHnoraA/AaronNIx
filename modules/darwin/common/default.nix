@@ -192,6 +192,7 @@
         {app = "/Applications/Brave Browser.app";}
         {app = "/Users/hc/Applications/Home Manager Apps/kitty.app";}
         {app = "/Users/hc/Applications/Home Manager Apps/Emacs.app";}
+        {app = "/Applications/Codex.app";}
         {app = "/Applications/TradingView.app";}
         {app = "/Applications/MarginNote 4.app";}
         {app = "/Applications/Zotero.app";}

@@ -73,12 +73,9 @@
     ]
     ++ lib.optionals stdenv.isDarwin [
       colima
-      mos
       podman
-      raycast
     ]
     ++ lib.optionals (!stdenv.isDarwin) [
-      anki
       tesseract
       unzip
       wl-clipboard

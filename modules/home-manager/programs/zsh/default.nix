@@ -4,8 +4,6 @@
   # 1. 安装需要的包
   home.packages = with pkgs; [
     zsh-powerlevel10k eza bat fzf zoxide pay-respects fastfetch fortune
-    nodejs
-    python3
     nix-index
     nix-search-cli
   ];

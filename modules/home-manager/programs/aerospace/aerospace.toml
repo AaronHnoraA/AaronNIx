@@ -274,6 +274,9 @@ run = ['move-node-to-workspace 0']
 if.app-id = 'com.bitwarden.desktop'
 run = ['move-node-to-workspace 0']
 [[on-window-detected]]
+if.app-id = 'com.openai.codex'
+run = ['move-node-to-workspace 2']
+[[on-window-detected]]
 if.app-id = 'us.zoom.xos'
 run = ['move-node-to-workspace 3']
 [[on-window-detected]]
@@ -303,7 +306,7 @@ if.app-id = 'org.zotero.zotero'
 run = ['move-node-to-workspace A', 'join-with up']
 [[on-window-detected]]
 if.app-id = 'QReader.MarginStudy.easy'
-run = ['move-node-to-workspace A', 'join-with down']
+run = ['move-node-to-workspace B', 'join-with down']
 [[on-window-detected]]
 if.app-id = 'org.gnu.Emacs'
 run = ['move-node-to-workspace C']
