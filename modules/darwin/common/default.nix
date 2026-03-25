@@ -190,7 +190,7 @@
         showhidden = true;               # 隐藏的应用图标半透明
         persistent-apps = [
         {app = "/Applications/Brave Browser.app";}
-        {app = "/Users/hc/Applications/Home Manager Apps/kitty.app";}
+        {app = "/Applications/kitty.app";}
         {app = "/Users/hc/Applications/Home Manager Apps/Emacs.app";}
         {app = "/Applications/TradingView.app";}
         {app = "/Applications/MarginNote 4.app";}
