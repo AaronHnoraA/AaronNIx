@@ -1,0 +1,1 @@
+launch /bin/sh -lc 'if command -v tmux >/dev/null 2>&1; then if [ -n "${TMUX:-}" ]; then exec "${SHELL:-/bin/zsh}" -l; else exec tmux new-session -A -s "${KITTY_TMUX_SESSION:-main}"; fi; else exec "${SHELL:-/bin/zsh}" -l; fi'
