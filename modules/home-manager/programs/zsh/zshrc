@@ -1,15 +1,21 @@
-eval "$(/opt/homebrew/bin/brew shellenv)"
-fastfetch
-echo "
+if [[ -x /opt/homebrew/bin/brew ]] \
+  && [[ -z ${HOMEBREW_PREFIX-} || -z ${HOMEBREW_CELLAR-} || -z ${HOMEBREW_REPOSITORY-} ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+if [[ -o interactive && -t 1 && -z ${ZSH_WELCOME_SHOWN-} ]]; then
+  export ZSH_WELCOME_SHOWN=1
+  (( $+commands[fastfetch] )) && fastfetch
+  echo "
                 (__) 
                  (oo) 
-           /------\/ 
+           /------\\/ 
           / |    ||   
-         *  /\---/\ 
+         *  /\\---/\\ 
             ~~   ~~   
-...\"Have you mooed today?\"..." 
-
-fortune
+...\\\"Have you mooed today?\\\"..."
+  (( $+commands[fortune] )) && fortune
+fi
 
 
 # If you come from bash you might have to change your $PATH.
@@ -100,7 +106,6 @@ plugins=(
             cp
             #git-open
             per-directory-history #ctrl + g
-            command-not-found
             safe-paste
             history-substring-search
         )
@@ -191,7 +196,6 @@ alias docker-tty-mac="docker run -it --rm --privileged --pid=host alpine:edge ns
 # vcpkg
 export VCPKG_ROOT="/Users/hc/Hc/SOURCE/vcpkg"
 
-source <(fzf --zsh)
 set rtp+=/opt/homebrew/opt/fzf
 
 alias CVshare="natclip -c -i=10.31.1.165"
