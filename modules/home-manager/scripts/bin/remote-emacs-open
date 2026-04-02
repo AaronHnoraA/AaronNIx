@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REMOTE_HOST="${REMOTE_HOST:-Aaron-WSL2}"
+REMOTE_SERVER_FILE="${REMOTE_SERVER_FILE:-~/.emacs.d/var/server/auth/server}"
+LOCAL_SERVER_DIR="${LOCAL_SERVER_DIR:-$HOME/.emacs.d/var/server/remote}"
+LOCAL_SERVER_FILE="${LOCAL_SERVER_FILE:-$LOCAL_SERVER_DIR/${REMOTE_HOST}.server}"
+PORT="${PORT:-54321}"
+EMACSCLIENT_BIN="${EMACSCLIENT_BIN:-emacsclient}"
+
+msg() {
+  printf '[remote-emacs] %s\n' "$*"
+}
+
+die() {
+  printf '[remote-emacs] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+ensure_local_dir() {
+  mkdir -p "$LOCAL_SERVER_DIR"
+  chmod 700 "$HOME/.emacs.d/var" 2>/dev/null || true
+  chmod 700 "$HOME/.emacs.d/var/server" 2>/dev/null || true
+  chmod 700 "$LOCAL_SERVER_DIR" 2>/dev/null || true
+}
+
+check_remote_file() {
+  msg "checking remote server file on ${REMOTE_HOST}..."
+  ssh "$REMOTE_HOST" "test -f ${REMOTE_SERVER_FILE}" ||
+    die "remote server file not found: ${REMOTE_SERVER_FILE}"
+}
+
+sync_server_file() {
+  msg "syncing remote server file..."
+  scp "${REMOTE_HOST}:${REMOTE_SERVER_FILE}" "$LOCAL_SERVER_FILE" >/dev/null
+  chmod 600 "$LOCAL_SERVER_FILE"
+  msg "updated local server file: $LOCAL_SERVER_FILE"
+}
+
+ensure_tunnel() {
+  msg "checking local tunnel on port ${PORT}..."
+
+  if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    msg "local port ${PORT} is already listening"
+    return
+  fi
+
+  msg "starting SSH tunnel..."
+  ssh -f -N -L "${PORT}:127.0.0.1:${PORT}" "$REMOTE_HOST"
+
+  sleep 1
+
+  if ! lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    die "failed to establish SSH tunnel on localhost:${PORT}"
+  fi
+
+  msg "SSH tunnel ready"
+}
+
+open_client() {
+  msg "opening local emacsclient..."
+  exec "$EMACSCLIENT_BIN" -c -f "$LOCAL_SERVER_FILE" "$@"
+}
+
+main() {
+  ensure_local_dir
+  check_remote_file
+  sync_server_file
+  ensure_tunnel
+  open_client "$@"
+}
+
+main "$@"
