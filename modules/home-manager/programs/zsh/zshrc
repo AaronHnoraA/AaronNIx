@@ -169,7 +169,53 @@ alias CMAKE="cmake -GNinja -DCMAKE_C_COMPILER=/opt/homebrew/bin/gcc-15 -DCMAKE_C
 
 export NIX_PATH="/Users/hc/.nixpkgs:/nix/var/nix/profiles/per-user/root/channels"
 
+# ==========================================
+# zoxide 配置与别名
+# ==========================================
+
+# 初始化 zoxide，将基础命令替换为 cd
 eval "$(zoxide init --cmd cd zsh)"
+
+# 1. 交互式选择跳转 (依赖 fzf)
+# 由于使用了 --cmd cd，默认的交互命令是 cdi，这里将其 alias 为你想要的 ccd
+alias ccd="cdi"
+
+# 2. 数据库与记录管理
+alias zq="zoxide query"            # 仅查询路径，不执行跳转
+alias zls="zoxide query -l"        # 按权重大小列出所有被 zoxide 记录的目录
+alias zrm="zoxide remove"          # zrm <路径>：手动从数据库移除某个路径
+alias zrm_current="zoxide remove ." # 从记录中移除当前所在目录
+
+# 3. 交互式清理失效目录
+# 使用 fzf 交互式多选 (Tab键) 你想从 zoxide 数据库中删除的目录
+alias zrmx="zoxide query -l | fzf -m --prompt='Remove directory> ' | xargs -I {} zoxide remove {}"
+
+# 4. 结合你常用编辑器的跳转函数 (Emacs / Neovim)
+
+# zv: 跳转到模糊匹配的目录，并立即用 Neovim 打开
+zv() {
+    local target_dir
+    target_dir=$(zoxide query "$@")
+    if [[ -n "$target_dir" ]]; then
+        cd "$target_dir" || return
+        nvim .
+    else
+        echo "❌ 未找到匹配的目录: $@"
+    fi
+}
+
+# ze: 跳转到模糊匹配的目录，并立即用 Emacs 打开
+ze() {
+    local target_dir
+    target_dir=$(zoxide query "$@")
+    if [[ -n "$target_dir" ]]; then
+        cd "$target_dir" || return
+        # 根据你个人的 Emacs 启动习惯可以修改这行，例如只是 `emacs .`
+        emacsclient -nw . 
+    else
+        echo "❌ 未找到匹配的目录: $@"
+    fi
+}
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
