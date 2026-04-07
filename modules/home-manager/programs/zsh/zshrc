@@ -202,18 +202,18 @@ zv() {
     fi
 }
 
-# ze: 跳转到模糊匹配的目录，并立即用 Emacs 打开
-ze() {
+
+zy() {
     local target_dir
     target_dir=$(zoxide query "$@")
     if [[ -n "$target_dir" ]]; then
         cd "$target_dir" || return
-        # 根据你个人的 Emacs 启动习惯可以修改这行，例如只是 `emacs .`
-        emacsclient -nw . 
+        yazi .
     else
         echo "❌ 未找到匹配的目录: $@"
     fi
 }
+
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
