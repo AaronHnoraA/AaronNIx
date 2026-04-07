@@ -177,8 +177,6 @@ export NIX_PATH="/Users/hc/.nixpkgs:/nix/var/nix/profiles/per-user/root/channels
 eval "$(zoxide init --cmd cd zsh)"
 
 # 1. 交互式选择跳转 (依赖 fzf)
-# 由于使用了 --cmd cd，默认的交互命令是 cdi，这里将其 alias 为你想要的 ccd
-alias ccd="cdi"
 
 # 2. 数据库与记录管理
 alias zq="zoxide query"            # 仅查询路径，不执行跳转
