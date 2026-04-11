@@ -1,40 +1,5 @@
 { config, pkgs, ... }:
 {
-  # Neovim text editor configuration
-  programs.neovim = {
-    enable = true;
-    package = pkgs.neovim-unwrapped;
-    defaultEditor = true;
-    withNodeJs = true;
-    withPython3 = true;
-    withRuby = true;
-
-    extraPackages = with pkgs; [
-      black
-      golangci-lint
-      gopls
-      gotools
-      hadolint
-      isort
-      lua-language-server
-      markdownlint-cli
-      nixd
-      nixfmt
-      nodePackages.bash-language-server
-      nodePackages.prettier
-      pyright
-      ruff
-      shellcheck
-      shfmt
-      stylua
-      terraform-ls
-      tflint
-      tree-sitter
-      vscode-langservers-extracted
-      yaml-language-server
-    ];
-  };
-
   home.activation.cloneNvimConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
     # 定义目标目录 (注意：XDG 标准是 ~/.config/emacs)
     TARGET_DIR="$HOME/.config/nvim"
@@ -52,6 +17,18 @@
       #$DRY_RUN_CMD cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull
     fi
   '';
+
+  home.packages = with pkgs; [ 
+    git 
+    ripgrep 
+    fd 
+    fzf
+    cmake   # vterm 编译通常需要
+    libtool # 某些 native 模块编译需要
+    pngpaste # Mac 上粘贴图片必备
+    clang
+    vscode-langservers-extracted
+  ];
 }
 
 
