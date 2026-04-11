@@ -35,7 +35,7 @@
     ];
   };
 
-  home.activation.cloneEmacsConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
+  home.activation.cloneNvimConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
     # 定义目标目录 (注意：XDG 标准是 ~/.config/emacs)
     TARGET_DIR="$HOME/.config/nvim"
     REPO_URL="http://git.pwo101.top/Config/Nvim.git"
