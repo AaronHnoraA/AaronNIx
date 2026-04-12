@@ -7,7 +7,7 @@
     # 使用 emacs-git (对应 emacs-plus --HEAD)
     # Overlay 里的 emacs-git 默认已开启 native-comp
     package = pkgs.emacs-git.override { 
-      withXwidgets = true; # 显式开启 xwidgets 支持
+      #withXwidgets = true; # 显式开启 xwidgets 支持
     };
 
     # 可选：在这个 block 里安装一些基础包，
