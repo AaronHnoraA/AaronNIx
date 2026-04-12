@@ -191,7 +191,8 @@
         persistent-apps = [
         {app = "/Applications/Brave Browser.app";}
         {app = "/Applications/kitty.app";}
-        {app = "/Users/hc/Applications/Home Manager Apps/Emacs.app";}
+        #{app = "/Users/hc/Applications/Home Manager Apps/Emacs.app";}
+        {app = "/Applications/Emacs.app";}
         {app = "/Applications/TradingView.app";}
         {app = "/Applications/MarginNote 4.app";}
         {app = "/Applications/Zotero.app";}
