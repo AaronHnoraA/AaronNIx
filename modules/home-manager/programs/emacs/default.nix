@@ -12,7 +12,7 @@
 
     # 可选：在这个 block 里安装一些基础包，
     # 但由于你下面使用了 config linking，通常由 Doom/Spacemacs 内部管理包
-    extraPackages = epkgs: [ epkgs.vterm ]; 
+    #extraPackages = epkgs: [ epkgs.vterm ]; 
   };
 
   # 链接你的配置文件
