@@ -6,6 +6,7 @@
     inputs.nix-homebrew.darwinModules.nix-homebrew
     ./conda
     ./mactex
+		./emcas
   ];
 
   # 2. 配置 nix-homebrew

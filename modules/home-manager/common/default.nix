@@ -21,7 +21,6 @@
     ../programs/k8s
     ../programs/lazygit
     ../programs/neovim
-    ../programs/emacs
     ../programs/saml2aws
     ../programs/starship
     ../programs/telegram
