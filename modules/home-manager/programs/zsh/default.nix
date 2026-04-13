@@ -8,24 +8,25 @@
     nix-search-cli
   ];
 
-  # 2. 把你的配置文件链接到 ~/.config/zsh/my_zshrc
-  xdg.configFile."zsh/my_zshrc".source = ./zshrc; 
 
-  # 自动载入 Emacs 配置仓库
-  system.activationScripts.cloneZshConfig.text = ''
-    TARGET_DIR="/Users/$SUDO_USER/.config/emacs"
+  home.activation.cloneZshConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
+    # 定义目标目录 (注意：XDG 标准是 ~/.config/emacs)
+    TARGET_DIR="$HOME/.config/zsh"
     REPO_URL="http://git.pwo101.top/Config/zsh.git"
 
+    # 检查目录是否存在
     if [ ! -d "$TARGET_DIR" ]; then
       echo "Emacs config not found, cloning from $REPO_URL..."
-      sudo -u "$SUDO_USER" ${pkgs.git}/bin/git clone "$REPO_URL" "$TARGET_DIR"
+      # 使用 $DRY_RUN_CMD 确保在 home-manager build --dry-run 时不执行
+      $DRY_RUN_CMD ${pkgs.git}/bin/git clone "$REPO_URL" "$TARGET_DIR"
     else
       echo "Emacs config already exists at $TARGET_DIR. Skipping clone."
-      # 如果你想每次 switch 自动 pull，可以改成：
+      # 可选：如果你希望每次 switch 都自动 pull 更新，可以解开下面注释
       # echo "Updating Emacs config..."
-      # sudo -u "$SUDO_USER" sh -c 'cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull'
+      #$DRY_RUN_CMD cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull
     fi
   '';
+
 
   # 3. 配置 zsh
   programs.zsh = {
