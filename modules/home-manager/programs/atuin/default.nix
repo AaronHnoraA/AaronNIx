@@ -10,6 +10,7 @@
       search_mode = "skim";
       secrets_filter = true;
       style = "compact";
+			sync_address = "http://10.31.2.53:1892"
     };
     flags = [ "--disable-up-arrow" ];
   };
