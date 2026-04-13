@@ -36,6 +36,9 @@
     initContent = ''
       # 加载你的自定义配置
       source ~/.config/zsh/my_zshrc
+      # Fix: clear screen after TUI apps to prevent bottom-line artifacts in kitty
+      function lazygit() { command lazygit "$@"; printf '\033[2J\033[H'; }
+      function yazi() { command yazi "$@"; printf '\033[2J\033[H'; }
       # 强制将 Nix profile 路径放在 PATH 最前面
       # 这会在所有其他初始化之后执行，覆盖 path_helper 的设置
       export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
