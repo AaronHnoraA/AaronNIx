@@ -1,17 +1,21 @@
 { ... }:
 {
   # Install atuin via home-manager module
-  programs.atuin = {
+	programs.atuin = {
     enable = true;
+    flags = [ "--disable-up-arrow" ];
+
     settings = {
       inline_height = 25;
       invert = true;
-      records = true;
       search_mode = "skim";
       secrets_filter = true;
       style = "compact";
-			sync_address = "http://10.31.2.53:1892"
+      sync_address = "https://atuin.pwo101.top";
+
+      sync = {
+        records = true;
+      };
     };
-    flags = [ "--disable-up-arrow" ];
   };
 }
