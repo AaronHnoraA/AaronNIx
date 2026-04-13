@@ -11,6 +11,22 @@
   # 2. 把你的配置文件链接到 ~/.config/zsh/my_zshrc
   xdg.configFile."zsh/my_zshrc".source = ./zshrc; 
 
+  # 自动载入 Emacs 配置仓库
+  system.activationScripts.cloneZshConfig.text = ''
+    TARGET_DIR="/Users/$SUDO_USER/.config/emacs"
+    REPO_URL="http://git.pwo101.top/Config/zsh.git"
+
+    if [ ! -d "$TARGET_DIR" ]; then
+      echo "Emacs config not found, cloning from $REPO_URL..."
+      sudo -u "$SUDO_USER" ${pkgs.git}/bin/git clone "$REPO_URL" "$TARGET_DIR"
+    else
+      echo "Emacs config already exists at $TARGET_DIR. Skipping clone."
+      # 如果你想每次 switch 自动 pull，可以改成：
+      # echo "Updating Emacs config..."
+      # sudo -u "$SUDO_USER" sh -c 'cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull'
+    fi
+  '';
+
   # 3. 配置 zsh
   programs.zsh = {
     enable = true;

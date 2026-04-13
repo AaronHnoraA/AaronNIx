@@ -65,7 +65,10 @@ git:
 
 clean:
 	@echo "Cleaning ..."
-	@nix-collect-garbage -d && nix-store --optimise
+	@home-manager expire-generations "-7 days" || true
+	@nix profile wipe-history --older-than 7d || true
+	@sudo nix-collect-garbage -d
+	@sudo nix-store --optimise
 	@echo "Clean complete."
 
 
