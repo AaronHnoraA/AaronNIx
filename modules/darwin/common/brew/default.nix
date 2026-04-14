@@ -30,6 +30,7 @@
     
     taps = [ 
       "homebrew/services" 
+			"farion1231/ccswitch"
     ];
     brews = [ 
       "wget"
@@ -45,6 +46,7 @@
       "aerospace"
       "kitty"
       "raycast"
+			"cc-switch"
     ];
   };
 }
