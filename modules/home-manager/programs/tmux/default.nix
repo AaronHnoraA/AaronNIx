@@ -20,10 +20,5 @@
       source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf";
       force = true;
     };
-
-    home.file.".tmux.conf.local" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf.local";
-      force = true;
-    };
   };
 }
