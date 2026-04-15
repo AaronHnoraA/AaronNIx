@@ -8,12 +8,22 @@
     xdg.configFile.tmux = {
       source = ./tmux;
       recursive = true;
+      force = true;
     };
 
-    home.file.".tmux.conf".source =
-      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf";
+    home.file.".tmux" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux";
+      force = true;
+    };
 
-    home.file.".tmux.conf.local".source =
-      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf.local";
+    home.file.".tmux.conf" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf";
+      force = true;
+    };
+
+    home.file.".tmux.conf.local" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/tmux/tmux.conf.local";
+      force = true;
+    };
   };
 }
