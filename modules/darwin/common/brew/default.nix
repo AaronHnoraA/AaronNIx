@@ -7,6 +7,7 @@
     ./conda
     ./mactex
 		./emacs
+		./yabai
   ];
 
   # 2. 配置 nix-homebrew
@@ -43,7 +44,6 @@
       "rust-analyzer"
     ];
     casks = [
-      "aerospace"
       "kitty"
       "raycast"
 			"cc-switch"

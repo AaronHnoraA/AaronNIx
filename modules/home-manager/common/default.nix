@@ -6,7 +6,6 @@
 }:
 {
   imports = [
-    ../programs/aerospace
     ../programs/kitty
     ../programs/albert
     ../programs/atuin
