@@ -1,16 +1,19 @@
 { pkgs, config, inputs, ... }: {
 
   # Homebrew 配置
-  homebrew = {
-    taps = [
-    ];
+	homebrew = {
+		taps = [
+			"asmvik/formulae"
+		];
 
-    brews = [
-    ];
+		brews = [
+			"asmvik/formulae/yabai"
+			"asmvik/formulae/skhd"
+		];
 
-    casks = [
-    ];
-  };
+		casks = [
+		];
+	};
 
   # 自动载入 Emacs 配置仓库
   system.activationScripts.cloneYabaiConfig.text = ''
