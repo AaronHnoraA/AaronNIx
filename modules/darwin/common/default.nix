@@ -1,6 +1,7 @@
 {
   outputs,
   pkgs,
+	lib,
   userConfig,
   ...
 }:
@@ -45,82 +46,73 @@
         NowPlaying = false;
       };
       CustomUserPreferences = {
-        "com.apple.symbolichotkeys" = {
-          AppleSymbolicHotKeys = {
-            "163" = {
-              # Set 'Option + N' for Show Notification Center
-              enabled = true;
-              value = {
-                parameters = [
-                  110
-                  45
-                  524288
-                ];
-                type = "standard";
-              };
-            };
-            "184" = {
-              # Set 'Option + Shift + R' for Screenshot and recording options
-              enabled = true;
-              value = {
-                parameters = [
-                  114
-                  15
-                  655360
-                ];
-                type = "standard";
-              };
-            };
-            "60" = {
-              # Disable '^ + Space' for selecting the previous input source
-              enabled = false;
-            };
-            "61" = {
-              # Set 'Option + Space' for selecting the next input source
-              enabled = 1;
-              value = {
-                parameters = [
-                  32
-                  49
-                  524288
-                ];
-                type = "standard";
-              };
-            };
-            "64" = {
-              # Disable 'Cmd + Space' for Spotlight Search
-              enabled = false;
-            };
-            "65" = {
-              # Disable 'Cmd + Alt + Space' for Finder search window
-              enabled = false;
-            };
-            "238" = {
-              # Set 'Control + Command + C' to center focused window
-              enabled = true;
-              value = {
-                parameters = [
-                  99
-                  8
-                  1310720
-                ];
-                type = "standard";
-              };
-            };
-            "98" = {
-              # Disable 'Show Help menu'
-              enabled = false;
-              value = {
-                parameters = [
-                  47
-                  44
-                  1179648
-                ];
-                type = "standard";
-              };
-            };
-          };
-        };
+				"com.apple.symbolichotkeys" = let
+					disabled = { enabled = false; };
+
+					std = p1: p2: p3: {
+						enabled = true;
+						value = {
+							parameters = [ p1 p2 p3 ];
+							type = "standard";
+						};
+					};
+
+					shift = 131072;
+					ctrl  = 262144;
+					alt   = 524288;
+					cmd   = 1048576;
+
+					arrowBase = 2097152;
+
+					mods4 = ctrl + alt + shift + cmd;  # ^⌥⇧⌘
+					mods3 = ctrl + shift + cmd;        # ^⇧⌘
+
+					keep = {
+						# Mission Control: ^⌥⇧⌘↑
+						"32" = std 65535 126 (arrowBase + mods4);
+						"34" = std 65535 126 (arrowBase + mods4 + shift);
+
+						# Move left a space: ^⇧⌘←
+						"79" = std 65535 123 (arrowBase + mods3);
+						"80" = std 65535 123 (arrowBase + mods3 + shift);
+
+						# Move right a space: ^⇧⌘→
+						"81" = std 65535 124 (arrowBase + mods3);
+						"82" = std 65535 124 (arrowBase + mods3 + shift);
+
+						# Switch to Desktop 1..10: ^⌥⇧⌘1..0
+						"118" = std 49 18 mods4;  # 1
+						"119" = std 50 19 mods4;  # 2
+						"120" = std 51 20 mods4;  # 3
+						"121" = std 52 21 mods4;  # 4
+						"122" = std 53 23 mods4;  # 5
+						"123" = std 54 22 mods4;  # 6
+						"124" = std 55 26 mods4;  # 7
+						"125" = std 56 28 mods4;  # 8
+						"126" = std 57 25 mods4;  # 9
+						"127" = std 48 29 mods4;  # 0 => Desktop 10
+					};
+
+					disableIds = [
+						7 8 9 10 11 12 13
+						27 28 29 30 31
+						32 34 35 36 37
+						51 52 57
+						60 61 64 65
+						79 80 81 82
+						98
+						118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133
+						160 163 175
+						181 182 184
+					];
+				in {
+					AppleSymbolicHotKeys =
+						(builtins.listToAttrs (map (id: {
+							name = toString id;
+							value = disabled;
+						}) disableIds))
+						// keep;
+				};
         "com.brave.Browser" = {
           NSUserKeyEquivalents = {
             "Close Tab" = "^w";
