@@ -22,7 +22,6 @@
     ../programs/neovim
     ../programs/saml2aws
     ../programs/starship
-    ../programs/telegram
     ../programs/tmux
     ../programs/zsh
     ../scripts
