@@ -42,6 +42,13 @@
       "pandoc"
       "rust"
       "rust-analyzer"
+			"eza" 
+			"zsh" 
+			"bat" 
+			"fzf" 
+			"zoxide" 
+			"fastfetch" 
+			"fortune"
     ];
     casks = [
       "kitty"
