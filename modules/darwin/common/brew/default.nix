@@ -1,59 +1,112 @@
-{ pkgs, config, inputs, ... }: {
-  
-  # 1. 在这里引入 nix-homebrew 模块
-  # 因为我们在 flake.nix 里传递了 inputs，所以这里能读到
+{ config, inputs, ... }: {
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
     ./conda
     ./mactex
-		./emacs
-		./yabai
+    ./emacs
+    ./yabai
   ];
 
-  # 2. 配置 nix-homebrew
   nix-homebrew = {
     enable = true;
-    enableRosetta = true; # M1/M2/M3 必需
-    user = "hc";   # 或者使用 config.users.primaryUser 动态获取
-    autoMigrate = true;   # 接管现有的 brew
-    
-    # 可选：配置 taps 的所有权，防止权限问题
-    # mutableTaps = false; 
+    enableRosetta = true;
+    user = config.system.primaryUser;
+    autoMigrate = true;
+    mutableTaps = true;
   };
 
-  # 3. 配置具体的包 (Homebrew 自身配置)
   homebrew = {
     enable = true;
     onActivation = {
       autoUpdate = true;
       upgrade = true;
+      cleanup = "none";
     };
-    
-    taps = [ 
-      "homebrew/services" 
-			"farion1231/ccswitch"
+
+    taps = [
+      "homebrew/services"
+      "felixkratz/formulae"
+      "zegervdv/zathura"
     ];
-    brews = [ 
-      "wget"
-      "vips"
-      "zoxide"
-      "trash"
+    brews = [
+      "aria2"
+      "bat"
+      "bash-completion"
+      "bitwarden-cli"
+      "cmake"
+      "direnv"
+      "entr"
+      "eza"
+      "fastfetch"
+      "fd"
+      "felixkratz/formulae/borders"
+      "fzf"
+      "fortune"
+      "git-delta"
+      "gnu-sed"
+      "gum"
+      "highlight"
+      "htop"
+      "httpie"
+      "jq"
       "jupytext"
+      "lazygit"
+      "m-cli"
+      "media-info"
+      "mkcert"
+      "mosh"
+      "navi"
+      "ncdu"
+      "neovim"
+      "nvm"
+      "ocrmypdf"
+      "openconnect"
       "pandoc"
+      "pngpaste"
+      "pv"
+      "ripgrep"
       "rust"
       "rust-analyzer"
-			"eza" 
-			"zsh" 
-			"bat" 
-			"fzf" 
-			"zoxide" 
-			"fastfetch" 
-			"fortune"
+      "rustup"
+      "sevenzip"
+      "smartmontools"
+      "speedtest-cli"
+      "telnet"
+      "tesseract-lang"
+      "thefuck"
+      "tmux"
+      "trash"
+      "tree"
+      "typst"
+      "vips"
+      "wakeonlan"
+      "watch"
+      "wget"
+      "yazi"
+      "zegervdv/zathura/zathura-pdf-mupdf"
+      "zegervdv/zathura/zathura-pdf-poppler"
+      "zoxide"
+      "zsh"
+      "zsh-syntax-highlighting"
     ];
     casks = [
+      "android-platform-tools"
+      "cc-switch"
+      "font-hack-nerd-font"
+      "font-jetbrains-mono-nerd-font"
+      "font-stix-two-math"
+      "font-symbols-only-nerd-font"
+      "goldendict"
+      "homerow"
+      "karabiner-elements"
       "kitty"
+      "lulu"
+      "obsidian"
+      "qlstephen"
       "raycast"
-			"cc-switch"
+      "sioyek"
+      "vagrant"
+      "zerotier-one"
     ];
   };
 }
