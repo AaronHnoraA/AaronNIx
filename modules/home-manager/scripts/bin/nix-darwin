@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="${NIX_DARWIN_CONFIG:-$HOME/.nixpkgs}"
+
+if [ ! -f "$repo/Makefile" ]; then
+  echo "Cannot find Nix Darwin Makefile at: $repo" >&2
+  echo "Set NIX_DARWIN_CONFIG to your config repository." >&2
+  exit 1
+fi
+
+target="${1:-help}"
+shift || true
+
+case "$target" in
+  daily | update)
+    target="daily-update"
+    ;;
+  controlled-full | controlled)
+    target="controlled-full-update"
+    ;;
+  full | native-full)
+    target="full-update"
+    ;;
+esac
+
+exec make -C "$repo" "$target" "$@"

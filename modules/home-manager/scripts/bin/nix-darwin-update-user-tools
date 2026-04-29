@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mode="${1:-daily}"
+
+run_if_available() {
+  local command="$1"
+  shift
+
+  if command -v "$command" >/dev/null 2>&1; then
+    "$command" "$@"
+  else
+    echo "Skipping $command: command not found"
+  fi
+}
+
+update_npm() {
+  if command -v npm >/dev/null 2>&1; then
+    echo "Updating global npm packages..."
+    npm update -g
+  else
+    echo "Skipping npm: command not found"
+  fi
+}
+
+update_cargo() {
+  if command -v cargo-install-update >/dev/null 2>&1; then
+    echo "Updating cargo-installed binaries..."
+    cargo install-update -a
+  elif command -v cargo >/dev/null 2>&1; then
+    echo "Skipping cargo-installed binary updates: cargo-install-update is not installed"
+    echo "Install it with: cargo install cargo-update"
+  else
+    echo "Skipping cargo: command not found"
+  fi
+}
+
+update_conda() {
+  if command -v conda >/dev/null 2>&1; then
+    echo "Updating conda package manager..."
+    conda update -n base -c defaults conda -y
+
+    if [ "$mode" = "full" ]; then
+      echo "Updating all packages in the active conda environment..."
+      conda update --all -y
+    fi
+  else
+    echo "Skipping conda: command not found"
+  fi
+}
+
+case "$mode" in
+  daily | controlled)
+    update_npm
+    update_cargo
+    update_conda
+    ;;
+  full)
+    update_npm
+    update_cargo
+    update_conda
+    run_if_available rustup update
+    ;;
+  *)
+    echo "Usage: nix-darwin-update-user-tools [daily|controlled|full]" >&2
+    exit 2
+    ;;
+esac
