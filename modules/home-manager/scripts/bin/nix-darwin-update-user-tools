@@ -2,13 +2,42 @@
 set -euo pipefail
 
 mode="${1:-daily}"
+target_user="${NIX_DARWIN_USER:-${SUDO_USER:-hc}}"
+failed=0
+
+if [ "$(id -u)" -eq 0 ]; then
+  if [ "$target_user" = "root" ]; then
+    echo "Refusing to run npm/cargo/conda updates as root." >&2
+    echo "Set NIX_DARWIN_USER to the target user, for example: NIX_DARWIN_USER=hc" >&2
+    exit 1
+  fi
+
+  echo "Running user-tool updates as $target_user..."
+  exec sudo --user="$target_user" --set-home env \
+    NIX_DARWIN_USER="$target_user" \
+    "$0" "$mode"
+fi
+
+warn_failed() {
+  local name="$1"
+  shift
+
+  failed=1
+  echo "Warning: $name update failed; continuing with the rest of the update." >&2
+
+  if [ "$#" -gt 0 ]; then
+    printf '%s\n' "$@" >&2
+  fi
+}
 
 run_if_available() {
   local command="$1"
   shift
 
   if command -v "$command" >/dev/null 2>&1; then
-    "$command" "$@"
+    if ! "$command" "$@"; then
+      warn_failed "$command"
+    fi
   else
     echo "Skipping $command: command not found"
   fi
@@ -16,8 +45,16 @@ run_if_available() {
 
 update_npm() {
   if command -v npm >/dev/null 2>&1; then
+    local prefix=""
+    prefix="$(npm prefix -g 2>/dev/null || true)"
+
     echo "Updating global npm packages..."
-    npm update -g
+    if ! npm update -g; then
+      warn_failed npm \
+        "Some global npm packages may be owned by another user." \
+        "Global npm prefix: ${prefix:-unknown}" \
+        "Inspect with: ls -la ${prefix:-/opt/homebrew}/lib/node_modules"
+    fi
   else
     echo "Skipping npm: command not found"
   fi
@@ -26,7 +63,9 @@ update_npm() {
 update_cargo() {
   if command -v cargo-install-update >/dev/null 2>&1; then
     echo "Updating cargo-installed binaries..."
-    cargo install-update -a
+    if ! cargo install-update -a; then
+      warn_failed cargo
+    fi
   elif command -v cargo >/dev/null 2>&1; then
     echo "Skipping cargo-installed binary updates: cargo-install-update is not installed"
     echo "Install it with: cargo install cargo-update"
@@ -38,11 +77,16 @@ update_cargo() {
 update_conda() {
   if command -v conda >/dev/null 2>&1; then
     echo "Updating conda package manager..."
-    conda update -n base -c defaults conda -y
+    if ! conda update -n base -c defaults conda -y; then
+      warn_failed conda
+      return 0
+    fi
 
     if [ "$mode" = "full" ]; then
       echo "Updating all packages in the active conda environment..."
-      conda update --all -y
+      if ! conda update --all -y; then
+        warn_failed conda
+      fi
     fi
   else
     echo "Skipping conda: command not found"
@@ -66,3 +110,7 @@ case "$mode" in
     exit 2
     ;;
 esac
+
+if [ "$failed" -ne 0 ]; then
+  echo "One or more user-tool updates failed, but the system update was allowed to continue." >&2
+fi
