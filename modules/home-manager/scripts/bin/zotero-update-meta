@@ -33,9 +33,18 @@ Options:
   --print                  Print an audit table. Prefers updated_meta.json
                            when present, otherwise original.json / local DB.
   --fetch-originals        Fetch selected item originals into the cache only.
+  --reviewed-update FILE   Merge a reviewed JSON patch into selected originals,
+                           normalize it against the Zotero local schema, write
+                           updated_meta.json, and print an audit. Combine with
+                           --write-updated to commit in one audited command.
   --write-updated          Write selected local updated_meta.json files to
-                           Zotero after an audit prompt. Requires --keys or
-                           --collection.
+                            Zotero after an audit prompt. Requires --keys or
+                            --collection.
+  --write-mode MODE        Write path for --write-updated: network or local.
+                            Default: ask interactively; pressing Enter chooses
+                            network. Non-interactive default is network.
+                            local writes zotero.sqlite directly and refuses to
+                            run while Zotero is open.
   --test-fetch             Fetch and print one Zotero item, then exit.
                            This verifies credentials and network access
                            without updating or writing metadata.
@@ -58,7 +67,9 @@ Examples:
   zotero-update-meta --list-collections tsp
   zotero-update-meta --collection 'UNSW-TSP/2026' --print
   zotero-update-meta --collection 'UNSW-TSP/2026' --run-update
+  zotero-update-meta --keys CJ46AZDZ --reviewed-update /tmp/meta.json --write-updated
   zotero-update-meta --keys EL96NTJQ,6IDFW45V --write-updated
+  zotero-update-meta --keys EL96NTJQ --write-updated --write-mode local
   zotero-update-meta --run-update
   zotero-update-meta --run-update -d 30
 EOF
@@ -143,6 +154,7 @@ zotero_assist() {
   ZOTERO_SQLITE="$zotero_db" \
   python3 - "$@" <<'PY'
 import argparse
+import datetime
 import json
 import os
 import shutil
@@ -327,6 +339,10 @@ def selected_keys(local: ZoteroLocal, args):
     return keys
 
 
+def selected_key_set(local: ZoteroLocal, args):
+    return set(selected_keys(local, args))
+
+
 def load_cached_item(output_dir: Path, key: str, prefer_updated: bool = True):
     item_dir = output_dir / key
     candidates = []
@@ -347,6 +363,88 @@ def load_cached_item(output_dir: Path, key: str, prefer_updated: bool = True):
         data["_source"] = str(path)
         return data
     return None
+
+
+def schema_for(conn):
+    item_types = dict(conn.execute("select typeName, itemTypeID from itemTypesCombined"))
+    creator_types = dict(conn.execute("select creatorType, creatorTypeID from creatorTypes"))
+    fields = dict(conn.execute("select fieldName, fieldID from fieldsCombined"))
+    valid_fields_by_type = {}
+    for type_name, field_name in conn.execute("""
+        select it.typeName, f.fieldName
+        from itemTypesCombined it
+        join itemTypeFieldsCombined itf on it.itemTypeID = itf.itemTypeID
+        join fieldsCombined f on itf.fieldID = f.fieldID
+    """):
+        valid_fields_by_type.setdefault(type_name, set()).add(field_name)
+    return item_types, creator_types, fields, valid_fields_by_type
+
+
+def normalize_item_for_schema(local: ZoteroLocal, data: dict) -> dict:
+    item_types, _creator_types, _fields, valid_fields_by_type = schema_for(local.conn)
+    normalized = dict(data)
+    item_type = normalized.get("itemType")
+    if item_type not in item_types:
+        die(f"{normalized.get('key', '<unknown>')}: unknown itemType {item_type!r}")
+
+    if item_type == "thesis" and "type" in normalized and "thesisType" not in normalized:
+        normalized["thesisType"] = normalized["type"]
+
+    keep = {
+        "key", "version", "itemType", "creators", "tags", "collections",
+        "relations", "dateAdded", "dateModified",
+    }
+    valid_fields = valid_fields_by_type.get(item_type, set())
+    for field_name in list(normalized.keys()):
+        if field_name in keep or field_name in valid_fields:
+            continue
+        normalized.pop(field_name, None)
+    return normalized
+
+
+def reviewed_patch_for_key(patch, key: str, only_key: bool):
+    if isinstance(patch, list):
+        matches = [item for item in patch if isinstance(item, dict) and item.get("key") == key]
+        if len(matches) != 1:
+            die(f"{key}: reviewed update list must contain exactly one matching object")
+        return matches[0]
+    if isinstance(patch, dict):
+        if key in patch and isinstance(patch[key], dict):
+            return patch[key]
+        if "items" in patch and isinstance(patch["items"], list):
+            return reviewed_patch_for_key(patch["items"], key, only_key)
+        if patch.get("key") in (None, key) and only_key:
+            return patch
+        if patch.get("key") == key:
+            return patch
+    die(f"{key}: cannot find reviewed update patch for selected key")
+
+
+def make_reviewed_update(args):
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    keys = selected_keys(local, args)
+    patch_path = Path(args.patch).expanduser()
+    patch = json.loads(patch_path.read_text(encoding="utf-8"))
+    only_key = len(keys) == 1
+
+    for key in keys:
+        original_path = output_dir / key / "original.json"
+        if not original_path.exists():
+            die(f"{key}: missing original.json; run --fetch-originals or allow --reviewed-update to fetch first")
+        original = json.loads(original_path.read_text(encoding="utf-8"))
+        data = dict(original.get("data", original))
+        patch_data = dict(reviewed_patch_for_key(patch, key, only_key))
+        patch_data.pop("_source", None)
+        patch_data.pop("_status", None)
+        if patch_data.get("key") not in (None, key):
+            die(f"{key}: patch key mismatch: {patch_data.get('key')!r}")
+        patch_data["key"] = key
+        data.update(patch_data)
+        data = normalize_item_for_schema(local, data)
+        updated_path = output_dir / key / "updated_meta.json"
+        updated_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"{key}\treviewed-update\t{data.get('itemType')}\t{data.get('title', '')}")
 
 
 def creators_text(item):
@@ -494,7 +592,10 @@ def write_updated(args):
         if not path.exists():
             print(f"{key}\tskipped\tmissing updated_meta.json")
             continue
-        payload = path.read_bytes()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data = normalize_item_for_schema(local, data)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
         try:
             with zotero_request(
                 f"https://api.zotero.org/users/{uid}/items/{key}",
@@ -506,8 +607,139 @@ def write_updated(args):
         except urllib.error.HTTPError as exc:
             print(f"{key}\terror\tHTTP {exc.code}")
             continue
-        title = json.loads(payload.decode("utf-8")).get("title", "")
+        title = data.get("title", "")
         print(f"{key}\twritten\tHTTP {status}\t{title}")
+
+
+def scalar_value(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value if value != "" else None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
+
+
+def write_updated_local(args):
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    db_path = Path(os.environ["ZOTERO_SQLITE"]).expanduser()
+    local = ZoteroLocal(db_path)
+    keys = selected_keys(local, args)
+    local.conn.close()
+    if local._tmp is not None:
+        local._tmp.cleanup()
+
+    if not db_path.exists():
+        die(f"Zotero database not found: {db_path}")
+    journal = db_path.with_name(db_path.name + "-journal")
+    if journal.exists():
+        die(f"refusing local sqlite write because {journal} exists; close Zotero cleanly first")
+
+    missing = [key for key in keys if not (output_dir / key / "updated_meta.json").exists()]
+    if missing:
+        die("missing updated_meta.json for: " + ", ".join(missing))
+
+    backup = db_path.with_name(
+        f"{db_path.name}.local-write-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
+    )
+    shutil.copy2(db_path, backup)
+    print(f"Local sqlite backup: {backup}", file=sys.stderr)
+
+    skip_data_keys = {
+        "key", "version", "itemType", "creators", "tags", "collections",
+        "relations", "dateAdded", "dateModified",
+    }
+
+    try:
+        conn = sqlite3.connect(db_path, timeout=1)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("BEGIN IMMEDIATE")
+    except sqlite3.OperationalError as exc:
+        die(f"refusing local sqlite write; database is locked or unavailable: {exc}")
+
+    with conn:
+        item_types, creator_types, fields, valid_fields_by_type = schema_for(conn)
+
+        now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        for key in keys:
+            payload_path = output_dir / key / "updated_meta.json"
+            data = json.loads(payload_path.read_text(encoding="utf-8"))
+            schema_local = type("SchemaLocal", (), {"conn": conn})()
+            data = normalize_item_for_schema(schema_local, data)
+            payload_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            if data.get("key") != key:
+                die(f"{key}: updated_meta.json key mismatch: {data.get('key')!r}")
+
+            row = conn.execute("select itemID from items where key=?", (key,)).fetchone()
+            if not row:
+                die(f"{key}: item not found in local Zotero database")
+            item_id = row[0]
+
+            item_type = data.get("itemType")
+            if item_type not in item_types:
+                die(f"{key}: unknown itemType {item_type!r}")
+            valid_fields = valid_fields_by_type.get(item_type, set())
+
+            conn.execute("""
+                update items
+                set itemTypeID=?, dateModified=?, clientDateModified=?, synced=0
+                where itemID=?
+            """, (item_types[item_type], now, now, item_id))
+
+            conn.execute("delete from itemData where itemID=?", (item_id,))
+            for field_name, raw_value in data.items():
+                if field_name in skip_data_keys or field_name not in valid_fields:
+                    continue
+                value = scalar_value(raw_value)
+                if value is None:
+                    continue
+                field_id = fields[field_name]
+                value_row = conn.execute(
+                    "select valueID from itemDataValues where value=?",
+                    (value,),
+                ).fetchone()
+                if value_row:
+                    value_id = value_row[0]
+                else:
+                    cur = conn.execute(
+                        "insert into itemDataValues(value) values (?)",
+                        (value,),
+                    )
+                    value_id = cur.lastrowid
+                conn.execute(
+                    "insert or replace into itemData(itemID, fieldID, valueID) values (?, ?, ?)",
+                    (item_id, field_id, value_id),
+                )
+
+            conn.execute("delete from itemCreators where itemID=?", (item_id,))
+            for index, creator in enumerate(data.get("creators") or []):
+                creator_type = creator.get("creatorType", "author")
+                creator_type_id = creator_types.get(creator_type)
+                if creator_type_id is None:
+                    die(f"{key}: unknown creatorType {creator_type!r}")
+
+                first_name = creator.get("firstName") or ""
+                last_name = creator.get("lastName") or creator.get("name") or ""
+                field_mode = 1 if creator.get("name") and not creator.get("lastName") else 0
+                creator_row = conn.execute("""
+                    select creatorID from creators
+                    where firstName=? and lastName=? and fieldMode=?
+                """, (first_name, last_name, field_mode)).fetchone()
+                if creator_row:
+                    creator_id = creator_row[0]
+                else:
+                    cur = conn.execute("""
+                        insert into creators(firstName, lastName, fieldMode)
+                        values (?, ?, ?)
+                    """, (first_name, last_name, field_mode))
+                    creator_id = cur.lastrowid
+                conn.execute("""
+                    insert into itemCreators(itemID, creatorID, creatorTypeID, orderIndex)
+                    values (?, ?, ?, ?)
+                """, (item_id, creator_id, creator_type_id, index))
+
+            print(f"{key}\tlocal-sqlite-written\t{item_type}\t{data.get('title', '')}")
 
 
 def list_collections(args):
@@ -524,11 +756,13 @@ def main():
     p = sub.add_parser("list-collections")
     p.add_argument("query", nargs="?")
 
-    for name in ("audit", "fetch-originals", "copy-cache", "write-updated"):
+    for name in ("audit", "fetch-originals", "copy-cache", "write-updated", "write-updated-local", "reviewed-update"):
         p = sub.add_parser(name)
         p.add_argument("--collection")
         p.add_argument("--recursive", action="store_true")
         p.add_argument("--keys", action="append")
+        if name == "reviewed-update":
+            p.add_argument("--patch", required=True)
 
     args = parser.parse_args()
     if args.cmd == "list-collections":
@@ -541,6 +775,10 @@ def main():
         copy_cache(args)
     elif args.cmd == "write-updated":
         write_updated(args)
+    elif args.cmd == "write-updated-local":
+        write_updated_local(args)
+    elif args.cmd == "reviewed-update":
+        make_reviewed_update(args)
     else:
         die(f"unknown helper command: {args.cmd}")
 
@@ -582,8 +820,18 @@ Useful commands:
   ./zotero-update-meta --collection 'UNSW-TSP/2026' --run-update
       Fetch only that collection's originals, then generate local updates.
 
+  ./zotero-update-meta --keys KEY1 --reviewed-update /path/to/patch.json
+      Fetch original metadata, merge a reviewed patch, normalize Zotero fields,
+      create updated_meta.json, then print the audit table. Codex should only
+      provide the reviewed patch and inspect this audit.
+
   ./zotero-update-meta --keys KEY1,KEY2 --write-updated
       Write only existing local updated_meta.json files for these keys.
+      At the prompt, choose network or local. Default is network.
+
+  ./zotero-update-meta --keys KEY1,KEY2 --write-updated --write-mode local
+      Write to local zotero.sqlite. Zotero must be closed; a sqlite backup is
+      created before writing. This preserves tags, collections, and attachments.
 
   Direct upstream --write is blocked by default because upstream logs can
   reveal the Zotero user id. Prefer --write-updated after auditing keys.
@@ -633,8 +881,20 @@ codex_prompt() {
 6. 把已生成的 updated_meta.json 精确写回：
    ./zotero-update-meta --keys KEY1,KEY2 --write-updated
 
-7. 不建议直接使用上游 --write；它的日志可能包含账户 id。
+7. Codex/人审计通过后的结构化补丁，可以交给工具自动生成更新文件并审计：
+   ./zotero-update-meta --keys KEY1 --reviewed-update /tmp/patch.json
+   ./zotero-update-meta --keys KEY1 --reviewed-update /tmp/patch.json --write-updated
+
+8. 写回时默认走网络 API；工具会先问 network/local，直接回车就是 network。
+   local 会直接修改本地 zotero.sqlite，只能在 Zotero 关闭时使用，并会先备份数据库。
+
+9. 不建议直接使用上游 --write；它的日志可能包含账户 id。
    先小范围 --run-update，再用 --write-updated 精确写回。
+
+本次固化的经验：
+- 论文类条目使用 Zotero 字段 thesisType，不使用 document 的 type 字段。
+- Crossref/DBLP 可能查不到机构仓储 DOI；这时应核对 DOI landing page，再人工生成 updated_meta.json 审计。
+- 精确写回前必须先看 audit 表，确认 key/title/DOI/itemType/creator 都是目标条目。
 
 默认输出目录：
   ~/.cache/zotero-update-meta
@@ -642,6 +902,8 @@ codex_prompt() {
 工作方式：
 - 用户可能会要求 print、查看、筛选、修改、更新某个范围、更新全部等。
 - 先判断用户要的是“只查看/本地生成/写回 Zotero”。
+- Codex 只应该接手交互确认、必要的网络/网页核查、审计判断；其他机械步骤交给工具。
+- 对人工核查后的字段，优先生成一个小 JSON patch，然后调用 --reviewed-update，让工具完成 fetch/merge/normalize/audit/write。
 - 查看数据时，优先读取 ~/.cache/zotero-update-meta/test-fetch.json 或各 item 目录下的 original.json / updated_meta.json。
 - 小范围任务优先用 --collection/--keys 限定，再调用 --print、--run-update 或 --write-updated。
 - 需要全量联网拉取时才调用 ./zotero-update-meta --run-update。
@@ -672,6 +934,9 @@ list_query=""
 print_selection=false
 fetch_originals=false
 write_updated=false
+write_mode=""
+reviewed_update_file=""
+reviewed_update_audited=false
 recursive=false
 selected_collection=""
 skip_confirmation=false
@@ -747,8 +1012,26 @@ while (($#)); do
       fetch_originals=true
       shift
       ;;
+    --reviewed-update)
+      [[ $# -ge 2 ]] || die "$1 requires a JSON patch path"
+      reviewed_update_file="$2"
+      shift 2
+      ;;
+    --reviewed-update=*)
+      reviewed_update_file="${1#*=}"
+      shift
+      ;;
     --write-updated)
       write_updated=true
+      shift
+      ;;
+    --write-mode)
+      [[ $# -ge 2 ]] || die "$1 requires network or local"
+      write_mode="$2"
+      shift 2
+      ;;
+    --write-mode=*)
+      write_mode="${1#*=}"
       shift
       ;;
     -h|--help)
@@ -828,6 +1111,18 @@ mkdir -p "$output_dir"
 [[ -d "$output_dir" ]] || die "output path is not a directory: $output_dir"
 [[ -w "$output_dir" ]] || die "output directory is not writable: $output_dir"
 
+if [[ "$write_updated" == true ]]; then
+  if [[ -z "$write_mode" && -t 0 ]]; then
+    printf 'Write path for --write-updated [network/local] (default network): ' >&2
+    read -r write_mode
+  fi
+  write_mode="${write_mode:-network}"
+  case "$write_mode" in
+    network|local) ;;
+    *) die "unknown --write-mode '$write_mode' (expected network or local)" ;;
+  esac
+fi
+
 if [[ -z "${ZOTERO_USER_ID:-}" && -f "$config_dir/ZOTERO_USER_ID" ]]; then
   ZOTERO_USER_ID="$(<"$config_dir/ZOTERO_USER_ID")"
 fi
@@ -846,7 +1141,7 @@ if [[ -n "${ZOTERO_API_KEY:-}" ]]; then
   export ZOTERO_API_KEY
 fi
 
-if [[ "$skip_download" == false || "$write" == true || "$write_updated" == true || "$fetch_originals" == true || "$test_fetch" == true ]]; then
+if [[ "$skip_download" == false || "$write" == true || ( "$write_updated" == true && "$write_mode" == network ) || "$fetch_originals" == true || -n "$reviewed_update_file" || "$test_fetch" == true ]]; then
   [[ -n "${ZOTERO_USER_ID:-}" ]] || die "missing Zotero user id. Set ZOTERO_USER_ID or create $config_dir/ZOTERO_USER_ID"
   [[ -n "${ZOTERO_API_KEY:-}" ]] || die "missing Zotero API key. Set ZOTERO_API_KEY or create $config_dir/ZOTERO_API_KEY"
   [[ "$ZOTERO_USER_ID" != \{* && "$ZOTERO_USER_ID" != *\} ]] || die "ZOTERO_USER_ID should be the numeric id only, without braces"
@@ -877,16 +1172,41 @@ if [[ "$fetch_originals" == true ]]; then
   exit 0
 fi
 
+if [[ -n "$reviewed_update_file" ]]; then
+  [[ -f "$reviewed_update_file" ]] || die "reviewed update patch not found: $reviewed_update_file"
+  build_selection_args
+  if [[ "$skip_download" == true ]]; then
+    zotero_assist copy-cache "${assist_selection[@]}"
+  else
+    zotero_assist fetch-originals "${assist_selection[@]}"
+  fi
+  zotero_assist reviewed-update --patch "$reviewed_update_file" "${assist_selection[@]}"
+  printf 'Audit after reviewed update normalization:\n' >&2
+  zotero_assist audit "${assist_selection[@]}"
+  reviewed_update_audited=true
+  if [[ "$write_updated" != true ]]; then
+    exit 0
+  fi
+fi
+
 if [[ "$write_updated" == true ]]; then
   build_selection_args
-  printf 'Audit before writing selected updated_meta.json files:\n' >&2
-  zotero_assist audit "${assist_selection[@]}"
+  if [[ "$reviewed_update_audited" != true ]]; then
+    printf 'Audit before writing selected updated_meta.json files via %s:\n' "$write_mode" >&2
+    zotero_assist audit "${assist_selection[@]}"
+  else
+    printf 'Writing reviewed update via %s after the audit above.\n' "$write_mode" >&2
+  fi
   if [[ "$skip_confirmation" != true ]]; then
     printf '\nWrite these existing updated_meta.json files to Zotero? Type "write" to continue: ' >&2
     read -r choice
     [[ "$choice" == "write" ]] || die "write-updated cancelled"
   fi
-  zotero_assist write-updated "${assist_selection[@]}"
+  if [[ "$write_mode" == local ]]; then
+    zotero_assist write-updated-local "${assist_selection[@]}"
+  else
+    zotero_assist write-updated "${assist_selection[@]}"
+  fi
   exit 0
 fi
 
