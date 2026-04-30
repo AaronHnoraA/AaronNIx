@@ -1,0 +1,366 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fill these in if you do not want to use environment variables or config files.
+# Keep the quotes. Do not add spaces around "=".
+
+ZOTERO_USER_ID_IN_SCRIPT="14333405"
+ZOTERO_API_KEY_IN_SCRIPT="o6S4aD3jxweJNWfnhtmuvW7b"
+
+usage() {
+  cat <<'EOF'
+Usage: zotero-update-meta [OPTIONS] [-- UPDATE_ZOTERO_META_OPTIONS]
+
+Zotero metadata assistant launcher and update_zotero_meta wrapper.
+
+Default behavior:
+  zotero-update-meta
+      Start an interactive Codex session in /Users/hc/Documents/Zotero.
+      Zotero credentials are injected through environment variables.
+      The Codex session can call ./zotero-update-meta to fetch/update data.
+
+Options:
+  -o, --output-dir DIR     Metadata cache/output directory.
+                           Default: ~/.cache/zotero-update-meta
+  -c, --config-dir DIR     Directory containing ZOTERO_USER_ID and
+                           ZOTERO_API_KEY files.
+                           Default: $XDG_CONFIG_HOME/zotero-update-meta or
+                           ~/.config/zotero-update-meta
+  --test-fetch             Fetch and print one Zotero item, then exit.
+                           This verifies credentials and network access
+                           without updating or writing metadata.
+  --run-update             Run update_zotero_meta directly. Options after
+                           this flag are passed to update_zotero_meta.
+  -h, --help               Show this wrapper help and the upstream help.
+
+All other options are passed to update_zotero_meta, for example:
+  -d, --min-update-interval-days INTEGER
+  -s, --skip-download
+  --skip-online-update
+  -w, --write
+  --skip-confirmation
+
+Examples:
+  zotero-update-meta                         # open Codex Zotero assistant
+  zotero-update-meta --test-fetch
+  zotero-update-meta --run-update
+  zotero-update-meta --run-update -d 30
+  zotero-update-meta --run-update --write
+  zotero-update-meta --run-update --write --skip-confirmation
+EOF
+}
+
+die() {
+  printf 'zotero-update-meta: %s\n' "$*" >&2
+  exit 1
+}
+
+need_command() {
+  command -v "$1" >/dev/null 2>&1 || die "command not found: $1"
+}
+
+trim_credential() {
+  local value="$1"
+  value="${value//$'\r'/}"
+  value="${value//$'\n'/}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+fetch_one_item() {
+  need_command curl
+  local headers_file="$output_dir/test-fetch.headers"
+  local body_file="$output_dir/test-fetch.json"
+  local status
+
+  status="$(
+    curl --silent --show-error \
+      --dump-header "$headers_file" \
+      --output "$body_file" \
+      --write-out "%{http_code}" \
+      --header "Zotero-API-Key: $ZOTERO_API_KEY" \
+      --header "Zotero-API-Version: 3" \
+      --get "https://api.zotero.org/users/$ZOTERO_USER_ID/items" \
+      --data-urlencode "format=json" \
+      --data-urlencode "limit=1"
+  )"
+
+  printf 'HTTP status: %s\n' "$status" >&2
+  printf 'Response headers saved to: %s\n' "$headers_file" >&2
+  printf 'Response body saved to: %s\n' "$body_file" >&2
+  printf '\n--- Response headers ---\n' >&2
+  cat "$headers_file" >&2
+  printf '\n--- Response body ---\n'
+  cat "$body_file"
+  printf '\n'
+
+  [[ "$status" == 2* ]] || return 1
+}
+
+write_codex_helper() {
+  mkdir -p "$zotero_workdir"
+  cat >"$zotero_workdir/zotero-update-meta" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+output_dir="${ZOTERO_META_OUTPUT_DIR:-$HOME/.cache/zotero-update-meta}"
+
+usage() {
+  cat <<'HELP'
+Usage: ./zotero-update-meta [OPTIONS]
+
+Codex-safe helper. Credentials must already be present in environment:
+  ZOTERO_USER_ID
+  ZOTERO_API_KEY
+
+Useful commands:
+  ./zotero-update-meta --test-fetch
+      Print one Zotero API item and save it to $HOME/.cache/zotero-update-meta/test-fetch.json
+
+  ./zotero-update-meta --run-update
+      Download Zotero metadata and generate updated metadata locally without writing to Zotero.
+
+  ./zotero-update-meta --run-update --skip-download --skip-online-update
+      Read already-downloaded local metadata only.
+
+  ./zotero-update-meta --run-update --write
+      Ask before writing each changed item back to Zotero.
+
+  ./zotero-update-meta --run-update --write --skip-confirmation
+      Automatically write changed items back to Zotero.
+HELP
+}
+
+need_credential() {
+  [[ -n "${ZOTERO_USER_ID:-}" ]] || { echo "missing ZOTERO_USER_ID" >&2; exit 1; }
+  [[ -n "${ZOTERO_API_KEY:-}" ]] || { echo "missing ZOTERO_API_KEY" >&2; exit 1; }
+}
+
+mkdir -p "$output_dir"
+
+case "${1:-}" in
+  -h|--help|"")
+    usage
+    ;;
+  --test-fetch)
+    need_credential
+    curl --fail --silent --show-error \
+      --header "Zotero-API-Key: $ZOTERO_API_KEY" \
+      --header "Zotero-API-Version: 3" \
+      --get "https://api.zotero.org/users/$ZOTERO_USER_ID/items" \
+      --data-urlencode "format=json" \
+      --data-urlencode "limit=1" \
+      --output "$output_dir/test-fetch.json"
+    cat "$output_dir/test-fetch.json"
+    printf '\n'
+    ;;
+  --run-update)
+    need_credential
+    shift
+    exec update_zotero_meta --output-dir "$output_dir" "$@"
+    ;;
+  *)
+    echo "unknown option: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+EOF
+  chmod 700 "$zotero_workdir/zotero-update-meta"
+}
+
+codex_prompt() {
+  cat <<'EOF'
+你是 Zotero 元信息维护助手。你的工作目录是 /Users/hc/Documents/Zotero。
+
+安全规则：
+- 不要打印、展示、保存、提交或复述 ZOTERO_USER_ID / ZOTERO_API_KEY。
+- 不要读取启动器脚本里的凭据区域。
+- 默认不要写回 Zotero；只有用户明确要求“写回/更新到 Zotero/--write”时才使用写回参数。
+- 大范围写回前先说明影响范围，并等待用户确认。
+
+你可以使用当前目录的工具：
+
+1. 测试读取 1 条 Zotero 数据：
+   ./zotero-update-meta --test-fetch
+
+2. 拉取 Zotero 元数据并在本地生成更新结果，不写回服务器：
+   ./zotero-update-meta --run-update
+
+3. 使用已有本地下载数据，不联网更新：
+   ./zotero-update-meta --run-update --skip-download --skip-online-update
+
+4. 手动确认每条变更后写回 Zotero：
+   ./zotero-update-meta --run-update --write
+
+5. 自动写回所有变更，只有用户明确要求时才用：
+   ./zotero-update-meta --run-update --write --skip-confirmation
+
+默认输出目录：
+  ~/.cache/zotero-update-meta
+
+工作方式：
+- 用户可能会要求 print、查看、筛选、修改、更新某个范围、更新全部等。
+- 先判断用户要的是“只查看/本地生成/写回 Zotero”。
+- 查看数据时，优先读取 ~/.cache/zotero-update-meta/test-fetch.json 或各 item 目录下的 original.json / updated_meta.json。
+- 需要联网拉取时调用 ./zotero-update-meta --run-update。
+- 回答时引用 item key、title、DOI、itemType 等字段，但不要泄露凭据。
+EOF
+}
+
+config_base="${XDG_CONFIG_HOME:-$HOME/.config}"
+output_dir="$HOME/.cache/zotero-update-meta"
+config_dir="$config_base/zotero-update-meta"
+zotero_workdir="/Users/hc/Documents/Zotero"
+skip_download=false
+test_fetch=false
+write=false
+run_update=false
+declare -a passthrough=()
+
+while (($#)); do
+  case "$1" in
+    -o|--output-dir)
+      [[ $# -ge 2 ]] || die "$1 requires a directory argument"
+      output_dir="$2"
+      shift 2
+      ;;
+    --output-dir=*)
+      output_dir="${1#*=}"
+      shift
+      ;;
+    -c|--config-dir)
+      [[ $# -ge 2 ]] || die "$1 requires a directory argument"
+      config_dir="$2"
+      shift 2
+      ;;
+    --config-dir=*)
+      config_dir="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      printf '\nupdate_zotero_meta help:\n\n'
+      need_command update_zotero_meta
+      update_zotero_meta --help
+      exit 0
+      ;;
+    -s|--skip-download)
+      skip_download=true
+      passthrough+=("$1")
+      shift
+      ;;
+    -w|--write)
+      write=true
+      passthrough+=("$1")
+      shift
+      ;;
+    --test-fetch)
+      test_fetch=true
+      shift
+      ;;
+    --run-update)
+      run_update=true
+      shift
+      passthrough+=("$@")
+      break
+      ;;
+    --)
+      shift
+      passthrough+=("$@")
+      break
+      ;;
+    *)
+      passthrough+=("$1")
+      shift
+      ;;
+  esac
+done
+
+for arg in "${passthrough[@]}"; do
+  case "$arg" in
+    -s|--skip-download)
+      skip_download=true
+      ;;
+    -w|--write)
+      write=true
+      ;;
+  esac
+done
+
+need_command update_zotero_meta
+
+case "$output_dir" in
+  /*) ;;
+  *) output_dir="$PWD/$output_dir" ;;
+esac
+
+case "$config_dir" in
+  /*) ;;
+  *) config_dir="$PWD/$config_dir" ;;
+esac
+
+mkdir -p "$output_dir"
+[[ -d "$output_dir" ]] || die "output path is not a directory: $output_dir"
+[[ -w "$output_dir" ]] || die "output directory is not writable: $output_dir"
+
+if [[ -z "${ZOTERO_USER_ID:-}" && -f "$config_dir/ZOTERO_USER_ID" ]]; then
+  ZOTERO_USER_ID="$(<"$config_dir/ZOTERO_USER_ID")"
+fi
+
+if [[ -z "${ZOTERO_API_KEY:-}" && -f "$config_dir/ZOTERO_API_KEY" ]]; then
+  ZOTERO_API_KEY="$(<"$config_dir/ZOTERO_API_KEY")"
+fi
+
+if [[ -z "${ZOTERO_USER_ID:-}" && -n "${ZOTERO_USER_ID_IN_SCRIPT:-}" ]]; then
+  ZOTERO_USER_ID="$ZOTERO_USER_ID_IN_SCRIPT"
+fi
+
+if [[ -z "${ZOTERO_API_KEY:-}" && -n "${ZOTERO_API_KEY_IN_SCRIPT:-}" ]]; then
+  ZOTERO_API_KEY="$ZOTERO_API_KEY_IN_SCRIPT"
+fi
+
+if [[ -n "${ZOTERO_USER_ID:-}" ]]; then
+  ZOTERO_USER_ID="$(trim_credential "$ZOTERO_USER_ID")"
+  export ZOTERO_USER_ID
+fi
+
+if [[ -n "${ZOTERO_API_KEY:-}" ]]; then
+  ZOTERO_API_KEY="$(trim_credential "$ZOTERO_API_KEY")"
+  export ZOTERO_API_KEY
+fi
+
+if [[ "$skip_download" == false || "$write" == true || "$test_fetch" == true ]]; then
+  [[ -n "${ZOTERO_USER_ID:-}" ]] || die "missing Zotero user id. Set ZOTERO_USER_ID or create $config_dir/ZOTERO_USER_ID"
+  [[ -n "${ZOTERO_API_KEY:-}" ]] || die "missing Zotero API key. Set ZOTERO_API_KEY or create $config_dir/ZOTERO_API_KEY"
+  [[ "$ZOTERO_USER_ID" != \{* && "$ZOTERO_USER_ID" != *\} ]] || die "ZOTERO_USER_ID should be the numeric id only, without braces"
+  [[ "$ZOTERO_USER_ID" =~ ^[0-9]+$ ]] || die "ZOTERO_USER_ID should be numeric. Current value: $ZOTERO_USER_ID"
+fi
+
+if [[ "$test_fetch" == true ]]; then
+  printf 'Testing Zotero API fetch for user %s...\n' "$ZOTERO_USER_ID" >&2
+  fetch_one_item
+  printf 'OK. Zotero API fetch worked.\n' >&2
+  exit 0
+fi
+
+if [[ "$run_update" == false ]]; then
+  need_command codex
+  write_codex_helper
+  printf 'Starting Codex Zotero assistant in: %s\n' "$zotero_workdir" >&2
+  printf 'Helper installed at: %s\n' "$zotero_workdir/zotero-update-meta" >&2
+  exec codex \
+    -C "$zotero_workdir" \
+    -c shell_environment_policy.inherit=all \
+    "$(codex_prompt)"
+fi
+
+if [[ "$skip_download" == false ]]; then
+  printf 'Preflight Zotero API fetch for user %s...\n' "$ZOTERO_USER_ID" >&2
+  fetch_one_item >/dev/null || die "Zotero API preflight failed. Run 'zotero-update-meta --test-fetch' to inspect the response."
+fi
+
+printf 'Using metadata output directory: %s\n' "$output_dir" >&2
+printf 'Using Zotero config directory: %s\n' "$config_dir" >&2
+exec update_zotero_meta --output-dir "$output_dir" "${passthrough[@]}"
