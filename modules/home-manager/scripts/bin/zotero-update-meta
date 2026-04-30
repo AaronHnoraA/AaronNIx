@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fill these in if you do not want to use environment variables or config files.
-# Keep the quotes. Do not add spaces around "=".
-
 ZOTERO_USER_ID_IN_SCRIPT="14333405"
 ZOTERO_API_KEY_IN_SCRIPT="o6S4aD3jxweJNWfnhtmuvW7b"
+
 
 usage() {
   cat <<'EOF'
@@ -26,6 +24,21 @@ Options:
                            ZOTERO_API_KEY files.
                            Default: $XDG_CONFIG_HOME/zotero-update-meta or
                            ~/.config/zotero-update-meta
+  --zotero-db PATH         Local Zotero SQLite database used for collection
+                           lookup and audit printing.
+                           Default: /Users/hc/Documents/Zotero/zotero.sqlite
+  --list-collections [Q]   List Zotero collections from the local database.
+  --collection NAME|ID     Limit print/fetch/update/write-updated actions to
+                           one local Zotero collection. Paths like
+                           "UNSW-TSP/2026" are supported.
+  --recursive              Include child collections when --collection is used.
+  --keys KEY[,KEY...]      Limit actions to explicit Zotero item keys.
+  --print                  Print an audit table. Prefers updated_meta.json
+                           when present, otherwise original.json / local DB.
+  --fetch-originals        Fetch selected item originals into the cache only.
+  --write-updated          Write selected local updated_meta.json files to
+                           Zotero after an audit prompt. Requires --keys or
+                           --collection.
   --test-fetch             Fetch and print one Zotero item, then exit.
                            This verifies credentials and network access
                            without updating or writing metadata.
@@ -37,16 +50,20 @@ All other options are passed to update_zotero_meta, for example:
   -d, --min-update-interval-days INTEGER
   -s, --skip-download
   --skip-online-update
-  -w, --write
-  --skip-confirmation
+
+Safety note:
+  Direct upstream -w/--write is blocked by default because the upstream logger
+  can print the Zotero user id. Prefer --write-updated after --print.
 
 Examples:
   zotero-update-meta                         # open Codex Zotero assistant
   zotero-update-meta --test-fetch
+  zotero-update-meta --list-collections tsp
+  zotero-update-meta --collection 'UNSW-TSP/2026' --print
+  zotero-update-meta --collection 'UNSW-TSP/2026' --run-update
+  zotero-update-meta --keys EL96NTJQ,6IDFW45V --write-updated
   zotero-update-meta --run-update
   zotero-update-meta --run-update -d 30
-  zotero-update-meta --run-update --write
-  zotero-update-meta --run-update --write --skip-confirmation
 EOF
 }
 
@@ -98,13 +115,451 @@ fetch_one_item() {
   [[ "$status" == 2* ]] || return 1
 }
 
+add_keys() {
+  local raw="$1"
+  raw="${raw//,/ }"
+  # shellcheck disable=SC2206
+  local parts=($raw)
+  local key
+  for key in "${parts[@]}"; do
+    [[ -n "$key" ]] && selected_keys+=("$key")
+  done
+}
+
+build_selection_args() {
+  assist_selection=()
+  if [[ -n "$selected_collection" ]]; then
+    assist_selection+=(--collection "$selected_collection")
+  fi
+  if [[ "$recursive" == true ]]; then
+    assist_selection+=(--recursive)
+  fi
+  if ((${#selected_keys[@]})); then
+    assist_selection+=(--keys "${selected_keys[*]}")
+  fi
+}
+
+zotero_assist() {
+  need_command python3
+  ZOTERO_META_OUTPUT_DIR="$output_dir" \
+  ZOTERO_META_SOURCE_DIR="${source_output_dir:-$output_dir}" \
+  ZOTERO_SQLITE="$zotero_db" \
+  python3 - "$@" <<'PY'
+import argparse
+import json
+import os
+import shutil
+import sqlite3
+import sys
+import tempfile
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+FIELD_NAMES = ("title", "date", "url", "DOI")
+
+
+def die(message: str, code: int = 1) -> None:
+    print(f"zotero-update-meta: {message}", file=sys.stderr)
+    raise SystemExit(code)
+
+
+class ZoteroLocal:
+    def __init__(self, db_path: Path):
+        self.db_path = db_path
+        self._tmp = None
+        self.conn = self._connect()
+
+    def _connect(self):
+        if not self.db_path.exists():
+            die(f"Zotero database not found: {self.db_path}")
+        self._tmp = tempfile.TemporaryDirectory(prefix="zotero-meta-db-")
+        tmp_db = Path(self._tmp.name) / "zotero.sqlite"
+        shutil.copy2(self.db_path, tmp_db)
+        journal = self.db_path.with_name(self.db_path.name + "-journal")
+        if journal.exists():
+            shutil.copy2(journal, tmp_db.with_name("zotero.sqlite-journal"))
+        return sqlite3.connect(tmp_db)
+
+    def collections(self):
+        rows = self.conn.execute(
+            "select collectionID, collectionName, parentCollectionID from collections"
+        ).fetchall()
+        by_id = {row[0]: row for row in rows}
+
+        def path_for(cid):
+            names = []
+            seen = set()
+            while cid is not None and cid in by_id and cid not in seen:
+                seen.add(cid)
+                row = by_id[cid]
+                names.append(row[1])
+                cid = row[2]
+            return "/".join(reversed(names))
+
+        return [(cid, name, parent, path_for(cid)) for cid, name, parent in rows]
+
+    def list_collections(self, query: str = ""):
+        query_l = query.casefold()
+        rows = self.collections()
+        if query:
+            rows = [
+                row for row in rows
+                if query_l in row[1].casefold() or query_l in row[3].casefold()
+            ]
+        return sorted(rows, key=lambda row: row[3].casefold())
+
+    def resolve_collection(self, selector: str) -> int:
+        rows = self.collections()
+        if selector.isdigit():
+            cid = int(selector)
+            if any(row[0] == cid for row in rows):
+                return cid
+            die(f"collection id not found: {selector}")
+
+        selector_l = selector.casefold().strip("/")
+        exact_path = [row for row in rows if row[3].casefold() == selector_l]
+        if len(exact_path) == 1:
+            return exact_path[0][0]
+        suffix_path = [row for row in rows if row[3].casefold().endswith("/" + selector_l)]
+        if len(suffix_path) == 1:
+            return suffix_path[0][0]
+        exact_name = [row for row in rows if row[1].casefold() == selector_l]
+        matches = exact_path or suffix_path or exact_name
+        if len(matches) == 1:
+            return matches[0][0]
+        if not matches:
+            close = [row for row in rows if selector_l in row[3].casefold()]
+            if close:
+                print("Matching collections:", file=sys.stderr)
+                for cid, _name, _parent, path in close[:20]:
+                    print(f"  {cid}\t{path}", file=sys.stderr)
+            die(f"collection not found: {selector}")
+        print("Ambiguous collection selector. Use a path or id:", file=sys.stderr)
+        for cid, _name, _parent, path in matches:
+            print(f"  {cid}\t{path}", file=sys.stderr)
+        die(f"ambiguous collection: {selector}")
+
+    def collection_ids(self, collection_id: int, recursive: bool):
+        ids = [collection_id]
+        if not recursive:
+            return ids
+        todo = [collection_id]
+        while todo:
+            parent = todo.pop()
+            children = [
+                row[0] for row in self.conn.execute(
+                    "select collectionID from collections where parentCollectionID=?",
+                    (parent,),
+                ).fetchall()
+            ]
+            ids.extend(children)
+            todo.extend(children)
+        return ids
+
+    def field_ids(self):
+        qmarks = ",".join("?" for _ in FIELD_NAMES)
+        rows = self.conn.execute(
+            f"select fieldName, fieldID from fields where fieldName in ({qmarks})",
+            FIELD_NAMES,
+        ).fetchall()
+        return dict(rows)
+
+    def item_rows_for_collection(self, collection_id: int, recursive: bool):
+        ids = self.collection_ids(collection_id, recursive)
+        qmarks = ",".join("?" for _ in ids)
+        return self.conn.execute(
+            f"""
+            select distinct i.key, it.typeName, ci.orderIndex
+            from collectionItems ci
+            join items i on ci.itemID=i.itemID
+            join itemTypes it on i.itemTypeID=it.itemTypeID
+            where ci.collectionID in ({qmarks})
+            order by ci.orderIndex, i.key
+            """,
+            ids,
+        ).fetchall()
+
+    def item_row_for_key(self, key: str):
+        row = self.conn.execute(
+            """
+            select i.itemID, i.key, it.typeName
+            from items i join itemTypes it on i.itemTypeID=it.itemTypeID
+            where i.key=?
+            """,
+            (key,),
+        ).fetchone()
+        if not row:
+            return {"key": key, "itemType": "", "title": "", "DOI": "", "date": "", "url": ""}
+        item_id, key, item_type = row
+        fields = self.field_ids()
+        values = {"key": key, "itemType": item_type, "title": "", "DOI": "", "date": "", "url": ""}
+        for name, fid in fields.items():
+            value = self.conn.execute(
+                """
+                select v.value
+                from itemData d join itemDataValues v on v.valueID=d.valueID
+                where d.itemID=? and d.fieldID=?
+                """,
+                (item_id, fid),
+            ).fetchone()
+            if value:
+                values[name] = value[0] or ""
+        return values
+
+
+def parse_keys(raw_values):
+    keys = []
+    for raw in raw_values or []:
+        for key in raw.replace(",", " ").split():
+            if key and key not in keys:
+                keys.append(key)
+    return keys
+
+
+def selected_keys(local: ZoteroLocal, args):
+    keys = parse_keys(args.keys)
+    if args.collection:
+        cid = local.resolve_collection(args.collection)
+        for key, _item_type, _order in local.item_rows_for_collection(cid, args.recursive):
+            if key not in keys:
+                keys.append(key)
+    if not keys:
+        die("no item keys selected; use --keys or --collection")
+    return keys
+
+
+def load_cached_item(output_dir: Path, key: str, prefer_updated: bool = True):
+    item_dir = output_dir / key
+    candidates = []
+    if prefer_updated:
+        candidates.append(("UPDATED", item_dir / "updated_meta.json"))
+    candidates.append(("ORIGINAL", item_dir / "original.json"))
+    for status, path in candidates:
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {"status": "BROKEN", "key": key, "note": f"{path.name}: {exc}"}
+        if status == "ORIGINAL":
+            data = data.get("data", data)
+        data = dict(data)
+        data["_status"] = status
+        data["_source"] = str(path)
+        return data
+    return None
+
+
+def creators_text(item):
+    names = []
+    for creator in item.get("creators", []) or []:
+        if creator.get("name"):
+            names.append(creator["name"])
+        else:
+            last = creator.get("lastName", "")
+            first = creator.get("firstName", "")
+            names.append(last if not first else f"{last}, {first}")
+    return "; ".join(name for name in names if name)
+
+
+def display_date(value):
+    text = str(value or "")
+    parts = text.split(" ", 1)
+    if len(parts) == 2 and len(parts[0]) == 10 and parts[0][4] == "-" and parts[0][7] == "-":
+        return parts[1]
+    return text
+
+
+def markdown_row(values):
+    def clean(value):
+        text = str(value or "").replace("\n", " ").replace("|", "\\|")
+        return text
+    return "| " + " | ".join(clean(value) for value in values) + " |"
+
+
+def audit(args):
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    keys = selected_keys(local, args)
+    rows = []
+    seen = {}
+    for key in keys:
+        cached = load_cached_item(output_dir, key)
+        db = local.item_row_for_key(key)
+        item = cached or db
+        status = item.get("_status", "DB_ONLY")
+        title = item.get("title", "")
+        doi = item.get("DOI", "")
+        url = item.get("url", "")
+        duplicate_token = (doi or url or title).casefold()
+        note = ""
+        if duplicate_token:
+            if duplicate_token in seen:
+                note = f"possible duplicate of {seen[duplicate_token]}"
+            else:
+                seen[duplicate_token] = key
+        rows.append([
+            status,
+            key,
+            item.get("itemType", db.get("itemType", "")),
+            title,
+            creators_text(item),
+            doi,
+            display_date(item.get("date", "")),
+            url,
+            note,
+        ])
+
+    header = ["status", "key", "itemType", "title", "creators", "DOI", "date", "url", "note"]
+    print(markdown_row(header))
+    print(markdown_row(["---"] * len(header)))
+    for row in rows:
+        print(markdown_row(row))
+
+    audit_path = output_dir / "audit-last.tsv"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    with audit_path.open("w", encoding="utf-8") as f:
+        f.write("\t".join(header) + "\n")
+        for row in rows:
+            f.write("\t".join(str(value or "").replace("\n", " ") for value in row) + "\n")
+    print(f"\nAudit TSV saved to: {audit_path}", file=sys.stderr)
+
+
+def zotero_request(url: str, api_key: str, method: str = "GET", data: bytes | None = None):
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Zotero-API-Key": api_key,
+            "Zotero-API-Version": "3",
+            "Content-Type": "application/json",
+        },
+    )
+    return urllib.request.urlopen(req, timeout=30)
+
+
+def require_credentials():
+    uid = os.environ.get("ZOTERO_USER_ID")
+    api_key = os.environ.get("ZOTERO_API_KEY")
+    if not uid or not api_key:
+        die("missing Zotero credentials in environment")
+    return uid, api_key
+
+
+def fetch_originals(args):
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    uid, api_key = require_credentials()
+    keys = selected_keys(local, args)
+    for key in keys:
+        item_dir = output_dir / key
+        item_dir.mkdir(parents=True, exist_ok=True)
+        target = item_dir / "original.json"
+        with zotero_request(f"https://api.zotero.org/users/{uid}/items/{key}", api_key) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        title = data.get("data", {}).get("title", "")
+        print(f"{key}\tfetched\t{title}")
+
+
+def copy_cache(args):
+    source_dir = Path(os.environ["ZOTERO_META_SOURCE_DIR"]).expanduser()
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    keys = selected_keys(local, args)
+    copied = 0
+    for key in keys:
+        src = source_dir / key
+        dst = output_dir / key
+        if not (src / "original.json").exists():
+            print(f"{key}\tskipped\tmissing original.json in {source_dir}")
+            continue
+        dst.mkdir(parents=True, exist_ok=True)
+        for name in ("original.json", "updated_meta.json"):
+            if (src / name).exists():
+                shutil.copy2(src / name, dst / name)
+        copied += 1
+        print(f"{key}\tcopied")
+    if copied == 0:
+        die(f"no selected original.json files found in {source_dir}")
+
+
+def write_updated(args):
+    output_dir = Path(os.environ["ZOTERO_META_OUTPUT_DIR"]).expanduser()
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    uid, api_key = require_credentials()
+    keys = selected_keys(local, args)
+    for key in keys:
+        path = output_dir / key / "updated_meta.json"
+        if not path.exists():
+            print(f"{key}\tskipped\tmissing updated_meta.json")
+            continue
+        payload = path.read_bytes()
+        try:
+            with zotero_request(
+                f"https://api.zotero.org/users/{uid}/items/{key}",
+                api_key,
+                method="PUT",
+                data=payload,
+            ) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            print(f"{key}\terror\tHTTP {exc.code}")
+            continue
+        title = json.loads(payload.decode("utf-8")).get("title", "")
+        print(f"{key}\twritten\tHTTP {status}\t{title}")
+
+
+def list_collections(args):
+    local = ZoteroLocal(Path(os.environ["ZOTERO_SQLITE"]).expanduser())
+    print("collectionID\tpath")
+    for cid, _name, _parent, path in local.list_collections(args.query or ""):
+        print(f"{cid}\t{path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="zotero-update-meta internal helper")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("list-collections")
+    p.add_argument("query", nargs="?")
+
+    for name in ("audit", "fetch-originals", "copy-cache", "write-updated"):
+        p = sub.add_parser(name)
+        p.add_argument("--collection")
+        p.add_argument("--recursive", action="store_true")
+        p.add_argument("--keys", action="append")
+
+    args = parser.parse_args()
+    if args.cmd == "list-collections":
+        list_collections(args)
+    elif args.cmd == "audit":
+        audit(args)
+    elif args.cmd == "fetch-originals":
+        fetch_originals(args)
+    elif args.cmd == "copy-cache":
+        copy_cache(args)
+    elif args.cmd == "write-updated":
+        write_updated(args)
+    else:
+        die(f"unknown helper command: {args.cmd}")
+
+
+if __name__ == "__main__":
+    main()
+PY
+}
+
 write_codex_helper() {
   mkdir -p "$zotero_workdir"
   cat >"$zotero_workdir/zotero-update-meta" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-output_dir="${ZOTERO_META_OUTPUT_DIR:-$HOME/.cache/zotero-update-meta}"
+launcher="/Users/hc/.nixpkgs/modules/home-manager/scripts/bin/zotero-update-meta"
 
 usage() {
   cat <<'HELP'
@@ -124,46 +579,26 @@ Useful commands:
   ./zotero-update-meta --run-update --skip-download --skip-online-update
       Read already-downloaded local metadata only.
 
-  ./zotero-update-meta --run-update --write
-      Ask before writing each changed item back to Zotero.
+  ./zotero-update-meta --collection 'UNSW-TSP/2026' --print
+      Print an audit table for a small local Zotero collection.
 
-  ./zotero-update-meta --run-update --write --skip-confirmation
-      Automatically write changed items back to Zotero.
+  ./zotero-update-meta --collection 'UNSW-TSP/2026' --run-update
+      Fetch only that collection's originals, then generate local updates.
+
+  ./zotero-update-meta --keys KEY1,KEY2 --write-updated
+      Write only existing local updated_meta.json files for these keys.
+
+  Direct upstream --write is blocked by default because upstream logs can
+  reveal the Zotero user id. Prefer --write-updated after auditing keys.
 HELP
 }
-
-need_credential() {
-  [[ -n "${ZOTERO_USER_ID:-}" ]] || { echo "missing ZOTERO_USER_ID" >&2; exit 1; }
-  [[ -n "${ZOTERO_API_KEY:-}" ]] || { echo "missing ZOTERO_API_KEY" >&2; exit 1; }
-}
-
-mkdir -p "$output_dir"
 
 case "${1:-}" in
   -h|--help|"")
     usage
     ;;
-  --test-fetch)
-    need_credential
-    curl --fail --silent --show-error \
-      --header "Zotero-API-Key: $ZOTERO_API_KEY" \
-      --header "Zotero-API-Version: 3" \
-      --get "https://api.zotero.org/users/$ZOTERO_USER_ID/items" \
-      --data-urlencode "format=json" \
-      --data-urlencode "limit=1" \
-      --output "$output_dir/test-fetch.json"
-    cat "$output_dir/test-fetch.json"
-    printf '\n'
-    ;;
-  --run-update)
-    need_credential
-    shift
-    exec update_zotero_meta --output-dir "$output_dir" "$@"
-    ;;
   *)
-    echo "unknown option: $1" >&2
-    usage >&2
-    exit 2
+    exec "$launcher" "$@"
     ;;
 esac
 EOF
@@ -191,11 +626,18 @@ codex_prompt() {
 3. 使用已有本地下载数据，不联网更新：
    ./zotero-update-meta --run-update --skip-download --skip-online-update
 
-4. 手动确认每条变更后写回 Zotero：
-   ./zotero-update-meta --run-update --write
+4. 查看 collection 或 key 的审计表：
+   ./zotero-update-meta --collection 'UNSW-TSP/2026' --print
+   ./zotero-update-meta --keys KEY1,KEY2 --print
 
-5. 自动写回所有变更，只有用户明确要求时才用：
-   ./zotero-update-meta --run-update --write --skip-confirmation
+5. 只处理某个 collection，不扫全库：
+   ./zotero-update-meta --collection 'UNSW-TSP/2026' --run-update
+
+6. 把已生成的 updated_meta.json 精确写回：
+   ./zotero-update-meta --keys KEY1,KEY2 --write-updated
+
+7. 不建议直接使用上游 --write；它的日志可能包含账户 id。
+   先小范围 --run-update，再用 --write-updated 精确写回。
 
 默认输出目录：
   ~/.cache/zotero-update-meta
@@ -204,8 +646,15 @@ codex_prompt() {
 - 用户可能会要求 print、查看、筛选、修改、更新某个范围、更新全部等。
 - 先判断用户要的是“只查看/本地生成/写回 Zotero”。
 - 查看数据时，优先读取 ~/.cache/zotero-update-meta/test-fetch.json 或各 item 目录下的 original.json / updated_meta.json。
-- 需要联网拉取时调用 ./zotero-update-meta --run-update。
+- 小范围任务优先用 --collection/--keys 限定，再调用 --print、--run-update 或 --write-updated。
+- 需要全量联网拉取时才调用 ./zotero-update-meta --run-update。
 - 回答时引用 item key、title、DOI、itemType 等字段，但不要泄露凭据。
+
+
+退出前需要做到:
+清理垃圾
+确认修改和安全
+
 EOF
 }
 
@@ -213,11 +662,22 @@ config_base="${XDG_CONFIG_HOME:-$HOME/.config}"
 output_dir="$HOME/.cache/zotero-update-meta"
 config_dir="$config_base/zotero-update-meta"
 zotero_workdir="/Users/hc/Documents/Zotero"
+zotero_db="$zotero_workdir/zotero.sqlite"
 skip_download=false
 test_fetch=false
 write=false
 run_update=false
+list_collections=false
+list_query=""
+print_selection=false
+fetch_originals=false
+write_updated=false
+recursive=false
+selected_collection=""
+skip_confirmation=false
 declare -a passthrough=()
+declare -a selected_keys=()
+declare -a assist_selection=()
 
 while (($#)); do
   case "$1" in
@@ -239,6 +699,58 @@ while (($#)); do
       config_dir="${1#*=}"
       shift
       ;;
+    --zotero-db)
+      [[ $# -ge 2 ]] || die "$1 requires a path argument"
+      zotero_db="$2"
+      shift 2
+      ;;
+    --zotero-db=*)
+      zotero_db="${1#*=}"
+      shift
+      ;;
+    --list-collections)
+      list_collections=true
+      if [[ $# -ge 2 && "$2" != -* ]]; then
+        list_query="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --collection)
+      [[ $# -ge 2 ]] || die "$1 requires a collection name/path/id"
+      selected_collection="$2"
+      shift 2
+      ;;
+    --collection=*)
+      selected_collection="${1#*=}"
+      shift
+      ;;
+    --recursive)
+      recursive=true
+      shift
+      ;;
+    --keys)
+      [[ $# -ge 2 ]] || die "$1 requires KEY[,KEY...]"
+      add_keys "$2"
+      shift 2
+      ;;
+    --keys=*)
+      add_keys "${1#*=}"
+      shift
+      ;;
+    --print|--audit)
+      print_selection=true
+      shift
+      ;;
+    --fetch-originals)
+      fetch_originals=true
+      shift
+      ;;
+    --write-updated)
+      write_updated=true
+      shift
+      ;;
     -h|--help)
       usage
       printf '\nupdate_zotero_meta help:\n\n'
@@ -256,6 +768,11 @@ while (($#)); do
       passthrough+=("$1")
       shift
       ;;
+    --skip-confirmation)
+      skip_confirmation=true
+      passthrough+=("$1")
+      shift
+      ;;
     --test-fetch)
       test_fetch=true
       shift
@@ -263,8 +780,6 @@ while (($#)); do
     --run-update)
       run_update=true
       shift
-      passthrough+=("$@")
-      break
       ;;
     --)
       shift
@@ -286,6 +801,9 @@ for arg in "${passthrough[@]}"; do
     -w|--write)
       write=true
       ;;
+    --skip-confirmation)
+      skip_confirmation=true
+      ;;
   esac
 done
 
@@ -301,6 +819,11 @@ case "$config_dir" in
   *) config_dir="$PWD/$config_dir" ;;
 esac
 
+case "$zotero_db" in
+  /*) ;;
+  *) zotero_db="$PWD/$zotero_db" ;;
+esac
+
 mkdir -p "$output_dir"
 [[ -d "$output_dir" ]] || die "output path is not a directory: $output_dir"
 [[ -w "$output_dir" ]] || die "output directory is not writable: $output_dir"
@@ -313,14 +836,6 @@ if [[ -z "${ZOTERO_API_KEY:-}" && -f "$config_dir/ZOTERO_API_KEY" ]]; then
   ZOTERO_API_KEY="$(<"$config_dir/ZOTERO_API_KEY")"
 fi
 
-if [[ -z "${ZOTERO_USER_ID:-}" && -n "${ZOTERO_USER_ID_IN_SCRIPT:-}" ]]; then
-  ZOTERO_USER_ID="$ZOTERO_USER_ID_IN_SCRIPT"
-fi
-
-if [[ -z "${ZOTERO_API_KEY:-}" && -n "${ZOTERO_API_KEY_IN_SCRIPT:-}" ]]; then
-  ZOTERO_API_KEY="$ZOTERO_API_KEY_IN_SCRIPT"
-fi
-
 if [[ -n "${ZOTERO_USER_ID:-}" ]]; then
   ZOTERO_USER_ID="$(trim_credential "$ZOTERO_USER_ID")"
   export ZOTERO_USER_ID
@@ -331,17 +846,47 @@ if [[ -n "${ZOTERO_API_KEY:-}" ]]; then
   export ZOTERO_API_KEY
 fi
 
-if [[ "$skip_download" == false || "$write" == true || "$test_fetch" == true ]]; then
+if [[ "$skip_download" == false || "$write" == true || "$write_updated" == true || "$fetch_originals" == true || "$test_fetch" == true ]]; then
   [[ -n "${ZOTERO_USER_ID:-}" ]] || die "missing Zotero user id. Set ZOTERO_USER_ID or create $config_dir/ZOTERO_USER_ID"
   [[ -n "${ZOTERO_API_KEY:-}" ]] || die "missing Zotero API key. Set ZOTERO_API_KEY or create $config_dir/ZOTERO_API_KEY"
   [[ "$ZOTERO_USER_ID" != \{* && "$ZOTERO_USER_ID" != *\} ]] || die "ZOTERO_USER_ID should be the numeric id only, without braces"
-  [[ "$ZOTERO_USER_ID" =~ ^[0-9]+$ ]] || die "ZOTERO_USER_ID should be numeric. Current value: $ZOTERO_USER_ID"
+  [[ "$ZOTERO_USER_ID" =~ ^[0-9]+$ ]] || die "ZOTERO_USER_ID should be numeric"
 fi
 
 if [[ "$test_fetch" == true ]]; then
-  printf 'Testing Zotero API fetch for user %s...\n' "$ZOTERO_USER_ID" >&2
+  printf 'Testing Zotero API fetch...\n' >&2
   fetch_one_item
   printf 'OK. Zotero API fetch worked.\n' >&2
+  exit 0
+fi
+
+if [[ "$list_collections" == true ]]; then
+  zotero_assist list-collections "$list_query"
+  exit 0
+fi
+
+if [[ "$print_selection" == true ]]; then
+  build_selection_args
+  zotero_assist audit "${assist_selection[@]}"
+  exit 0
+fi
+
+if [[ "$fetch_originals" == true ]]; then
+  build_selection_args
+  zotero_assist fetch-originals "${assist_selection[@]}"
+  exit 0
+fi
+
+if [[ "$write_updated" == true ]]; then
+  build_selection_args
+  printf 'Audit before writing selected updated_meta.json files:\n' >&2
+  zotero_assist audit "${assist_selection[@]}"
+  if [[ "$skip_confirmation" != true ]]; then
+    printf '\nWrite these existing updated_meta.json files to Zotero? Type "write" to continue: ' >&2
+    read -r choice
+    [[ "$choice" == "write" ]] || die "write-updated cancelled"
+  fi
+  zotero_assist write-updated "${assist_selection[@]}"
   exit 0
 fi
 
@@ -356,8 +901,50 @@ if [[ "$run_update" == false ]]; then
     "$(codex_prompt)"
 fi
 
+if [[ "$write" == true && "${ZOTERO_ALLOW_UNSAFE_UPSTREAM_WRITE:-}" != "1" ]]; then
+  die "refusing upstream --write because upstream logs may print the Zotero user id. Use --write-updated after auditing selected keys, or set ZOTERO_ALLOW_UNSAFE_UPSTREAM_WRITE=1."
+fi
+
+if [[ -n "$selected_collection" || ${#selected_keys[@]} -gt 0 ]]; then
+  build_selection_args
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  subset_dir="$output_dir/subsets/selection-$timestamp"
+  mkdir -p "$subset_dir"
+  printf 'Preparing selected item cache: %s\n' "$subset_dir" >&2
+  original_output_dir="$output_dir"
+  source_output_dir="$original_output_dir"
+  output_dir="$subset_dir"
+  if [[ "$skip_download" == true ]]; then
+    zotero_assist copy-cache "${assist_selection[@]}"
+  else
+    zotero_assist fetch-originals "${assist_selection[@]}"
+  fi
+  output_dir="$original_output_dir"
+  unset source_output_dir
+
+  limited_passthrough=("${passthrough[@]}")
+  if [[ "$skip_download" == false ]]; then
+    limited_passthrough+=(--skip-download)
+  fi
+  printf 'Running update_zotero_meta on selected items only.\n' >&2
+  printf 'Selected output directory: %s\n' "$subset_dir" >&2
+  set +e
+  update_zotero_meta --output-dir "$subset_dir" "${limited_passthrough[@]}"
+  status=$?
+  set -e
+  for item_dir in "$subset_dir"/*; do
+    [[ -d "$item_dir" ]] || continue
+    key="$(basename "$item_dir")"
+    mkdir -p "$original_output_dir/$key"
+    [[ -f "$item_dir/original.json" ]] && cp "$item_dir/original.json" "$original_output_dir/$key/original.json"
+    [[ -f "$item_dir/updated_meta.json" ]] && cp "$item_dir/updated_meta.json" "$original_output_dir/$key/updated_meta.json"
+  done
+  printf 'Selected run finished. Results copied back to: %s\n' "$original_output_dir" >&2
+  exit "$status"
+fi
+
 if [[ "$skip_download" == false ]]; then
-  printf 'Preflight Zotero API fetch for user %s...\n' "$ZOTERO_USER_ID" >&2
+  printf 'Preflight Zotero API fetch...\n' >&2
   fetch_one_item >/dev/null || die "Zotero API preflight failed. Run 'zotero-update-meta --test-fetch' to inspect the response."
 fi
 
