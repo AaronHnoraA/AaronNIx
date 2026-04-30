@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZOTERO_USER_ID_IN_SCRIPT="14333405"
-ZOTERO_API_KEY_IN_SCRIPT="o6S4aD3jxweJNWfnhtmuvW7b"
-
 
 usage() {
   cat <<'EOF'
