@@ -35,11 +35,7 @@
           };
         };
         nativeBuildInputs = [ final.pkg-config ];
-        buildInputs = [ final.openssl ]
-          ++ final.lib.optionals final.stdenv.isDarwin [
-            final.darwin.apple_sdk.frameworks.CoreServices
-            final.darwin.apple_sdk.frameworks.CoreFoundation
-          ];
+        buildInputs = [ final.openssl ];
       };
     };
 }
