@@ -31,6 +31,7 @@
   nixpkgs = {
     overlays = [
       outputs.overlays.stable-packages
+      outputs.overlays.typst-dev
     ];
 
     config = {
@@ -66,6 +67,7 @@
       python3
       ripgrep
       terraform
+      typst
       wmctrl
     ]
     ++ lib.optionals stdenv.isDarwin [
