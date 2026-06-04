@@ -179,6 +179,7 @@
         showhidden = true;               # 隐藏的应用图标半透明
         persistent-apps = [
         {app = "/Applications/Brave Browser.app";}
+        {app = "/Applications/Neovide.app";}
         {app = "/Applications/kitty.app";}
         {app = "/Applications/AaronNote.app";}
         {app = "/Applications/TradingView.app";}

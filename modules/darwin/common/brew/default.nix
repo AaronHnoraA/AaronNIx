@@ -132,6 +132,7 @@ in
         "sioyek"
         "vagrant"
         "zerotier-one"
+        "neovide"
       ];
     };
 
