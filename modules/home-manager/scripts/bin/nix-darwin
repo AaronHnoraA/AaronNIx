@@ -13,11 +13,8 @@ target="${1:-help}"
 shift || true
 
 case "$target" in
-  daily | update)
-    target="daily-update"
-    ;;
-  controlled-full | controlled)
-    target="controlled-full-update"
+  daily | update | controlled-full | controlled)
+    target="full-update"
     ;;
   full | native-full)
     target="full-update"

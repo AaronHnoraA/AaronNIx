@@ -16,10 +16,10 @@ This is not intended to be a drop-in configuration for other machines. It contai
 ## What This Manages
 
 - macOS system defaults, Finder, Dock, keyboard behavior, trackpad settings, screenshots, fonts, and Touch ID for sudo.
-- Homebrew taps, formulae, casks, and controlled upgrade behavior.
+- Homebrew taps, formulae, casks, and full upgrade behavior.
 - Home Manager programs such as kitty, atuin, bat, btop, fzf, Git, GPG, lazygit, Neovim, starship, tmux, and zsh.
 - Shared CLI packages and local scripts under `modules/home-manager/scripts/bin`.
-- Update workflows that separate routine updates from high-risk updates such as Emacs.
+- Full update workflows for Homebrew, flakes, nix-darwin, Home Manager, and user-level tools.
 - Retained NixOS and Linux desktop configuration used by earlier or secondary setups.
 
 ## Repository Layout
@@ -55,22 +55,17 @@ make darwin-rebuild
 make home-manager-switch
 ```
 
-Run the daily controlled update flow:
-
-```sh
-make daily-update
-```
-
-Update approved flake inputs, then run the daily flow:
-
-```sh
-make controlled-full-update
-```
-
-Run a full native update without protected skips:
+Run the full update flow:
 
 ```sh
 make full-update
+```
+
+Compatibility aliases for the same full update flow:
+
+```sh
+make daily-update
+make controlled-full-update
 ```
 
 Check the flake:
@@ -111,37 +106,21 @@ Examples:
 nix-darwin daily
 nix-darwin controlled-full
 nix-darwin full
-nix-darwin brew-update-emacs
 ```
 
-The helper command dispatches to the corresponding `Makefile` targets.
+All three update commands dispatch to `make full-update`.
 
 ## Update Strategy
 
-Routine updates and high-risk updates are intentionally separated.
+There is no protected Emacs update path anymore. `full-update` performs:
 
-`daily-update` rebuilds nix-darwin, switches Home Manager, runs controlled Homebrew updates, and updates user-level tools such as npm, Cargo, and Conda. Controlled Homebrew updates skip protected items.
+- native Homebrew update and upgrade for formulae and casks
+- full `nix flake update`
+- nix-darwin rebuild
+- Home Manager switch
+- full user-tool update mode
 
-The default protected Homebrew cask is:
-
-```nix
-local.homebrew.protectedCasks = [
-  "emacs-plus-app@master"
-];
-```
-
-Protected Homebrew items can still be updated explicitly:
-
-```sh
-nix-darwin brew-update-protected
-nix-darwin brew-update-emacs
-```
-
-The protected flake input is:
-
-```make
-PROTECTED_NIX_INPUTS = emacs-overlay
-```
+The update flow does not run Neovim plugin updates. Neovim plugins are managed from inside Neovim when needed.
 
 See [docs/nix-darwin-update.md](./docs/nix-darwin-update.md) for the full update policy.
 
@@ -153,7 +132,7 @@ Homebrew remains the source of truth for macOS GUI applications and some CLI too
 modules/darwin/common/brew/default.nix
 ```
 
-It declares taps, formulae, casks, protected packages, and the controlled upgrade script used during nix-darwin activation.
+It declares taps, formulae, casks, and the Homebrew upgrade script used during nix-darwin activation.
 
 ## Home Manager
 

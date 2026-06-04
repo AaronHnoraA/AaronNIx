@@ -6,82 +6,12 @@
   ...
 }:
 let
-  cfg = config.local.homebrew;
-
-  controlledBrewUpgrade = pkgs.writeShellScript "brew-upgrade-controlled" ''
+  brewUpgrade = pkgs.writeShellScript "brew-upgrade-all" ''
     set -euo pipefail
 
-    protected_formulae=(${lib.escapeShellArgs cfg.protectedFormulae})
-    protected_casks=(${lib.escapeShellArgs cfg.protectedCasks})
-
-    is_protected() {
-      local needle="$1"
-      shift
-
-      local item
-      for item in "$@"; do
-        if [ "$needle" = "$item" ]; then
-          return 0
-        fi
-      done
-
-      return 1
-    }
-
     brew update
-
-    while IFS= read -r item; do
-      [ -n "$item" ] || continue
-
-      if is_protected "$item" "''${protected_formulae[@]}"; then
-        echo "Skipping protected Homebrew formula: $item"
-        continue
-      fi
-
-      brew upgrade "$item"
-    done < <(brew outdated --formula --quiet || true)
-
-    while IFS= read -r item; do
-      [ -n "$item" ] || continue
-
-      if is_protected "$item" "''${protected_casks[@]}"; then
-        echo "Skipping protected Homebrew cask: $item"
-        continue
-      fi
-
-      brew upgrade --cask "$item"
-    done < <(brew outdated --cask --quiet || true)
-
-    ${lib.optionalString ((cfg.protectedFormulae ++ cfg.protectedCasks) != [ ]) ''
-      echo "Protected Homebrew items skipped by controlled upgrade: ${lib.escapeShellArgs (cfg.protectedFormulae ++ cfg.protectedCasks)}"
-    ''}
-  '';
-
-  protectedBrewUpgrade = pkgs.writeShellScriptBin "brew-upgrade-protected" ''
-    set -euo pipefail
-
-    protected_formulae=(${lib.escapeShellArgs cfg.protectedFormulae})
-    protected_casks=(${lib.escapeShellArgs cfg.protectedCasks})
-
-    brew update
-
-    for item in "''${protected_formulae[@]}"; do
-      [ -n "$item" ] || continue
-      if brew list --formula "$item" >/dev/null 2>&1; then
-        brew upgrade "$item"
-      else
-        echo "Skipping uninstalled protected Homebrew formula: $item"
-      fi
-    done
-
-    for item in "''${protected_casks[@]}"; do
-      [ -n "$item" ] || continue
-      if brew list --cask "$item" >/dev/null 2>&1; then
-        brew upgrade --cask "$item"
-      else
-        echo "Skipping uninstalled protected Homebrew cask: $item"
-      fi
-    done
+    brew upgrade
+    brew upgrade --cask
   '';
 in
 {
@@ -89,31 +19,10 @@ in
     inputs.nix-homebrew.darwinModules.nix-homebrew
     ./conda
     ./mactex
-    ./emacs
     ./yabai
   ];
 
-  options.local.homebrew = {
-    protectedFormulae = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      description = "Homebrew formulae skipped by the automatic controlled upgrade.";
-    };
-
-    protectedCasks = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [
-        "emacs-plus-app@master"
-      ];
-      description = "Homebrew casks skipped by the automatic controlled upgrade.";
-    };
-  };
-
   config = {
-    environment.systemPackages = [
-      protectedBrewUpgrade
-    ];
-
     nix-homebrew = {
       enable = true;
       enableRosetta = true;
@@ -125,9 +34,8 @@ in
     homebrew = {
       enable = true;
       onActivation = {
-        # Brewfile installs stay declarative. Upgrades are handled below so the
-        # protected lists can be skipped while unmanaged Homebrew packages are
-        # still updated.
+        # Brewfile installs stay declarative. Upgrades are handled by the
+        # post-activation script so unmanaged Homebrew packages are updated too.
         autoUpdate = false;
         upgrade = false;
         cleanup = "none";
@@ -144,6 +52,7 @@ in
         "bash-completion"
         "bitwarden-cli"
         "cmake"
+        "deno"
         "direnv"
         "entr"
         "eza"
@@ -205,6 +114,7 @@ in
         "zsh-syntax-highlighting"
       ];
       casks = [
+        "anaconda"
         "android-platform-tools"
         "cc-switch"
         "font-hack-nerd-font"
@@ -226,7 +136,7 @@ in
     };
 
     system.activationScripts.postActivation.text = lib.mkAfter ''
-      echo "Running Homebrew update/upgrade, excluding protected items..."
+      echo "Running full Homebrew update/upgrade..."
 
       if [ -x "${config.homebrew.prefix}/bin/brew" ]; then
         sudo \
@@ -236,9 +146,9 @@ in
           env \
             PATH="${config.homebrew.prefix}/bin:${lib.makeBinPath [ pkgs.mas ]}:$PATH" \
             HOMEBREW_NO_AUTO_UPDATE=1 \
-            ${controlledBrewUpgrade}
+            ${brewUpgrade}
       else
-        echo "Homebrew is not installed, skipping controlled upgrade."
+        echo "Homebrew is not installed, skipping Homebrew upgrade."
       fi
     '';
   };

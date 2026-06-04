@@ -15,18 +15,18 @@
 		];
 	};
 
-  # 自动载入 Emacs 配置仓库
+  # 自动载入 yabai 配置仓库
   system.activationScripts.cloneYabaiConfig.text = ''
     TARGET_DIR="/Users/$SUDO_USER/.config/yabai"
     REPO_URL="http://git.pwo101.top/Config/yabai.git"
 
     if [ ! -d "$TARGET_DIR" ]; then
-      echo "Emacs config not found, cloning from $REPO_URL..."
+      echo "yabai config not found, cloning from $REPO_URL..."
       sudo -u "$SUDO_USER" ${pkgs.git}/bin/git clone "$REPO_URL" "$TARGET_DIR"
 			mkdir ~/.config/skhd/ 
 			ln -sL ~/.config/yabai/skhdrc ~/.config/skhd/skhdrc
     else
-      echo "Emacs config already exists at $TARGET_DIR. Skipping clone."
+      echo "yabai config already exists at $TARGET_DIR. Skipping clone."
       # 如果你想每次 switch 自动 pull，可以改成：
       # echo "Updating Emacs config..."
       # sudo -u "$SUDO_USER" sh -c 'cd "$TARGET_DIR" && ${pkgs.git}/bin/git pull'
