@@ -78,8 +78,8 @@
       . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
     fi
 
-    # Prefer Nix profile binaries.
-    export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+    # PATH policy belongs in ~/.zprofile and ~/.zshrc. Keep ~/.zshenv neutral so
+    # non-interactive shells do not accidentally make Nix cc/ld the default.
   '';
 
   # ---------------------------------------------------------------------------
