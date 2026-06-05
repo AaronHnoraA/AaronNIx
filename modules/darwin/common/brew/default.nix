@@ -102,7 +102,6 @@ in
         "tmux"
         "trash"
         "tree"
-        "typst"
         "vips"
         "wakeonlan"
         "watch"
