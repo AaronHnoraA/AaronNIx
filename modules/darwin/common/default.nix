@@ -180,7 +180,6 @@
         persistent-apps = [
         {app = "/Applications/Brave Browser.app";}
         {app = "/Applications/kitty.app";}
-        {app = "/Applications/AaronNote.app/";}
         {app = "/Applications/Emacs.app/";}
         {app = "/Applications/TradingView.app";}
         {app = "/Applications/MarginNote 4.app";}
