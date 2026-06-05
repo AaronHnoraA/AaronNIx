@@ -18,6 +18,7 @@ in
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
     ./conda
+    ./emacs
     ./mactex
     ./yabai
   ];
@@ -43,7 +44,6 @@ in
 
       taps = [
         "homebrew/services"
-        "d12frosted/emacs-plus"
         "felixkratz/formulae"
         "zegervdv/zathura"
       ];
@@ -117,7 +117,6 @@ in
         "anaconda"
         "android-platform-tools"
         "cc-switch"
-        "emacs-plus-app@master"
         "font-hack-nerd-font"
         "font-jetbrains-mono-nerd-font"
         "font-stix-two-math"
