@@ -112,6 +112,7 @@ in
         "zoxide"
         "zsh"
         "zsh-syntax-highlighting"
+        "keith/formulae/reminders-cli"
       ];
       casks = [
         "anaconda"
