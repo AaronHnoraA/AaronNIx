@@ -60,10 +60,8 @@
       nh
       opencode
       openconnect
-      pipenv
       podman-compose
       podman-tui
-      python3
       ripgrep
       terraform
       wmctrl
@@ -73,6 +71,8 @@
       podman
     ]
     ++ lib.optionals (!stdenv.isDarwin) [
+      pipenv
+      python3
       tesseract
       unzip
       wl-clipboard

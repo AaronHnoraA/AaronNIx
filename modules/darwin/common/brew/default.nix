@@ -17,7 +17,6 @@ in
 {
   imports = [
     inputs.nix-homebrew.darwinModules.nix-homebrew
-    ./conda
     ./emacs
     ./mactex
     ./yabai
@@ -71,6 +70,7 @@ in
         "httpie"
         "jq"
         "jupytext"
+        "jupyterlab"
         "lazygit"
         "llvm"
         "m-cli"
@@ -89,6 +89,8 @@ in
         "pngpaste"
         "pv"
         "python@3.14"
+        "python-lsp-server"
+        "pyright"
         "ripgrep"
         "rust"
         "rust-analyzer"
