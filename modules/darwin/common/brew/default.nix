@@ -6,8 +6,14 @@
   ...
 }:
 let
+  tapName = tap: if builtins.isString tap then tap else tap.name;
+  declaredThirdPartyTaps = builtins.filter
+    (name: !(lib.hasPrefix "homebrew/" name))
+    (map tapName config.homebrew.taps);
+  declaredThirdPartyTapArgs = lib.escapeShellArgs declaredThirdPartyTaps;
   brewUpgrade = pkgs.writeShellScript "brew-upgrade-all" ''
     set -euo pipefail
+    export HOMEBREW_REQUIRE_TAP_TRUST=1
 
     brew update
     brew upgrade
@@ -44,7 +50,8 @@ in
       taps = [
         "homebrew/services"
         "felixkratz/formulae"
-        "zegervdv/zathura"
+        "keith/formulae"
+        "homebrew-zathura/zathura"
       ];
       brews = [
         "aria2"
@@ -109,8 +116,8 @@ in
         "watch"
         "wget"
         "yazi"
-        "zegervdv/zathura/zathura-pdf-mupdf"
-        "zegervdv/zathura/zathura-pdf-poppler"
+        "homebrew-zathura/zathura/zathura-pdf-mupdf"
+        "homebrew-zathura/zathura/zathura-pdf-poppler"
         "zoxide"
         "zsh"
         "zsh-syntax-highlighting"
@@ -138,6 +145,49 @@ in
       ];
     };
 
+    # Homebrew 6 requires explicit trust before loading third-party Ruby tap
+    # definitions. Trust every already-installed tap automatically, plus taps
+    # declared by Nix that may not have been installed yet. No duplicate trust
+    # list needs to be maintained.
+    system.activationScripts.preActivation.text = lib.mkAfter ''
+      if [ -x "${config.homebrew.prefix}/bin/brew" ]; then
+        echo "Trusting installed and Nix-declared Homebrew taps..."
+
+        while IFS= read -r tap; do
+          [ -n "$tap" ] || continue
+          sudo \
+            --preserve-env=PATH \
+            --user=${lib.escapeShellArg config.homebrew.user} \
+            --set-home \
+            env \
+              PATH="${config.homebrew.prefix}/bin:$PATH" \
+              HOMEBREW_NO_AUTO_UPDATE=1 \
+              brew trust --tap "$tap"
+        done < <(
+          sudo \
+            --preserve-env=PATH \
+            --user=${lib.escapeShellArg config.homebrew.user} \
+            --set-home \
+            env \
+              PATH="${config.homebrew.prefix}/bin:$PATH" \
+              HOMEBREW_NO_AUTO_UPDATE=1 \
+              brew tap
+        )
+
+        sudo \
+          --preserve-env=PATH \
+          --user=${lib.escapeShellArg config.homebrew.user} \
+          --set-home \
+          env \
+            PATH="${config.homebrew.prefix}/bin:$PATH" \
+            HOMEBREW_NO_AUTO_UPDATE=1 \
+            brew trust --tap ${declaredThirdPartyTapArgs}
+      fi
+
+      # This export remains active for nix-darwin's later `brew bundle` step.
+      export HOMEBREW_REQUIRE_TAP_TRUST=1
+    '';
+
     system.activationScripts.postActivation.text = lib.mkAfter ''
       echo "Running full Homebrew update/upgrade..."
 
@@ -149,6 +199,7 @@ in
           env \
             PATH="${config.homebrew.prefix}/bin:${lib.makeBinPath [ pkgs.mas ]}:$PATH" \
             HOMEBREW_NO_AUTO_UPDATE=1 \
+            HOMEBREW_REQUIRE_TAP_TRUST=1 \
             ${brewUpgrade}
       else
         echo "Homebrew is not installed, skipping Homebrew upgrade."
