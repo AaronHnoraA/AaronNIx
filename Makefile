@@ -5,7 +5,7 @@ HOME_TARGET ?= $(FLAKE)
 EXPERIMENTAL ?= --extra-experimental-features "nix-command flakes"
 USER_TOOLS_UPDATE ?= $(CURDIR)/modules/home-manager/scripts/bin/nix-darwin-update-user-tools
 
-.PHONY: help install-nix install-nix-darwin darwin-rebuild nixos-rebuild \
+.PHONY: help install-nix install-nix-darwin darwin-rebuild \
 	home-manager-switch nix-gc flake-update brew-update user-tools-update \
 	user-tools-update-full daily-update controlled-full-update \
 	full-update flake-check bootstrap-mac clean git
@@ -15,7 +15,6 @@ help:
 	@echo "  install-nix          - Install the Nix package manager"
 	@echo "  install-nix-darwin   - Install nix-darwin using flake $(FLAKE)"
 	@echo "  darwin-rebuild       - Rebuild the nix-darwin configuration"
-	@echo "  nixos-rebuild        - Rebuild the NixOS configuration"
 	@echo "  home-manager-switch  - Switch the Home Manager configuration using flake $(HOME_TARGET)"
 	@echo "  nix-gc               - Run Nix garbage collection"
 	@echo "  flake-update         - Update all flake inputs"
@@ -42,11 +41,6 @@ darwin-rebuild:
 	@echo "Rebuilding darwin configuration..."
 	@sudo darwin-rebuild switch --flake $(FLAKE)
 	@echo "Darwin rebuild complete."
-
-nixos-rebuild:
-	@echo "Rebuilding NixOS configuration..."
-	@sudo nixos-rebuild switch --flake $(FLAKE)
-	@echo "NixOS rebuild complete."
 
 home-manager-switch:
 	@echo "Switching Home Manager configuration..."

@@ -1,6 +1,6 @@
 # Nix Configuration
 
-This is my personal Nix configuration repository. The active focus is my macOS workstation and Home Manager user environment, with some NixOS/Linux configuration kept for reference and continuity.
+This is my personal Nix configuration repository for my macOS workstation and Home Manager user environment.
 
 The repository is built around flakes, nix-darwin, Home Manager, and Homebrew. Its goal is to keep system settings, command-line tools, GUI applications, editor-related tooling, custom scripts, and update workflows in one place.
 
@@ -10,8 +10,6 @@ This is not intended to be a drop-in configuration for other machines. It contai
 
 - `AaronMac`: current main macOS machine, managed with nix-darwin.
 - `Aaron.hc@AaronMac`: Home Manager environment for the macOS machine.
-- `energy`: retained NixOS host configuration, mainly kept as Linux configuration history.
-- `home/nabokikh/energy`: retained Linux Home Manager configuration.
 
 ## What This Manages
 
@@ -20,7 +18,6 @@ This is not intended to be a drop-in configuration for other machines. It contai
 - Home Manager programs such as kitty, atuin, bat, btop, fzf, Git, GPG, lazygit, Neovim, starship, tmux, and zsh.
 - Shared CLI packages and local scripts under `modules/home-manager/scripts/bin`.
 - Full update workflows for Homebrew, flakes, nix-darwin, Home Manager, and user-level tools.
-- Retained NixOS and Linux desktop configuration used by earlier or secondary setups.
 
 ## Repository Layout
 
@@ -33,7 +30,6 @@ home/              Home Manager user entries
 modules/darwin/    macOS and nix-darwin modules
 modules/home-manager/
                    User environment, program modules, and scripts
-modules/nixos/     NixOS modules
 overlays/          Custom overlays
 files/             Static assets such as wallpaper and avatar
 docs/              Additional documentation

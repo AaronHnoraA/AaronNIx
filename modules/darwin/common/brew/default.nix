@@ -16,8 +16,8 @@ let
     export HOMEBREW_REQUIRE_TAP_TRUST=1
 
     brew update
-    brew upgrade
-    brew upgrade --cask
+    brew upgrade --no-ask
+    brew upgrade --cask --no-ask
   '';
 in
 {
@@ -152,37 +152,26 @@ in
     # list needs to be maintained.
     system.activationScripts.preActivation.text = lib.mkAfter ''
       if [ -x "${config.homebrew.prefix}/bin/brew" ]; then
+        run_brew() {
+          sudo \
+            --preserve-env=PATH \
+            --user=${lib.escapeShellArg config.homebrew.user} \
+            --set-home \
+            env \
+              PATH="${config.homebrew.prefix}/bin:$PATH" \
+              HOMEBREW_NO_AUTO_UPDATE=1 \
+              HOMEBREW_REQUIRE_TAP_TRUST=1 \
+              brew "$@"
+        }
+
         echo "Trusting installed and Nix-declared Homebrew taps..."
 
         while IFS= read -r tap; do
           [ -n "$tap" ] || continue
-          sudo \
-            --preserve-env=PATH \
-            --user=${lib.escapeShellArg config.homebrew.user} \
-            --set-home \
-            env \
-              PATH="${config.homebrew.prefix}/bin:$PATH" \
-              HOMEBREW_NO_AUTO_UPDATE=1 \
-              brew trust --tap "$tap"
-        done < <(
-          sudo \
-            --preserve-env=PATH \
-            --user=${lib.escapeShellArg config.homebrew.user} \
-            --set-home \
-            env \
-              PATH="${config.homebrew.prefix}/bin:$PATH" \
-              HOMEBREW_NO_AUTO_UPDATE=1 \
-              brew tap
-        )
+          run_brew trust --tap "$tap"
+        done < <(run_brew tap)
 
-        sudo \
-          --preserve-env=PATH \
-          --user=${lib.escapeShellArg config.homebrew.user} \
-          --set-home \
-          env \
-            PATH="${config.homebrew.prefix}/bin:$PATH" \
-            HOMEBREW_NO_AUTO_UPDATE=1 \
-            brew trust --tap ${declaredThirdPartyTapArgs}
+        run_brew trust --tap ${declaredThirdPartyTapArgs}
       fi
 
       # This export remains active for nix-darwin's later `brew bundle` step.
@@ -202,6 +191,24 @@ in
             HOMEBREW_NO_AUTO_UPDATE=1 \
             HOMEBREW_REQUIRE_TAP_TRUST=1 \
             ${brewUpgrade}
+
+        sudo \
+          --user=${lib.escapeShellArg config.homebrew.user} \
+          --set-home \
+          ${pkgs.coreutils}/bin/mkdir -p \
+          "${config.homebrew.prefix}/opt/zathura/lib/zathura"
+        sudo \
+          --user=${lib.escapeShellArg config.homebrew.user} \
+          --set-home \
+          ${pkgs.coreutils}/bin/ln -sfn \
+          "${config.homebrew.prefix}/opt/zathura-pdf-mupdf/libpdf-mupdf.dylib" \
+          "${config.homebrew.prefix}/opt/zathura/lib/zathura/libpdf-mupdf.dylib"
+        sudo \
+          --user=${lib.escapeShellArg config.homebrew.user} \
+          --set-home \
+          ${pkgs.coreutils}/bin/ln -sfn \
+          "${config.homebrew.prefix}/opt/zathura-pdf-poppler/libpdf-poppler.dylib" \
+          "${config.homebrew.prefix}/opt/zathura/lib/zathura/libpdf-poppler.dylib"
       else
         echo "Homebrew is not installed, skipping Homebrew upgrade."
       fi

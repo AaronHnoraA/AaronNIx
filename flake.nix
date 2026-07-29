@@ -1,5 +1,5 @@
 {
-  description = "NixOS and nix-darwin configs for my machines";
+  description = "nix-darwin and Home Manager configs for my Mac";
   inputs = {
     # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -10,9 +10,6 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # NixOS profiles to optimize settings for different hardware
-    hardware.url = "github:nixos/nixos-hardware";
 
     # Global catppuccin theme
     catppuccin.url = "github:catppuccin/nix";
@@ -76,18 +73,6 @@
         };
       };
 
-      # Function for NixOS system configuration
-      mkNixosConfiguration =
-        hostname: username:
-        nixpkgs.lib.nixosSystem {
-          specialArgs = {
-            inherit inputs outputs hostname;
-            userConfig = users.${username};
-            nixosModules = "${self}/modules/nixos";
-          };
-          modules = [ ./hosts/${hostname} ];
-        };
-
       # Function for nix-darwin system configuration
       mkDarwinConfiguration =
         hostname: username:
@@ -122,10 +107,6 @@
         };
     in
     {
-      nixosConfigurations = {
-        energy = mkNixosConfiguration "energy" "hc";
-      };
-
       darwinConfigurations = {
         "AaronMac" = mkDarwinConfiguration "AaronMac" "Aaron.hc";
       };
@@ -134,7 +115,6 @@
         "Aaron.hc@AaronMac" =
           mkHomeConfiguration "aarch64-darwin" "Aaron.hc"
             "AaronMac";
-        "hc@energy" = mkHomeConfiguration "x86_64-linux" "hc" "energy";
       };
 
       overlays = import ./overlays { inherit inputs; };
