@@ -58,7 +58,6 @@
       fd
       jq
       nh
-      opencode
       openconnect
       podman-compose
       podman-tui

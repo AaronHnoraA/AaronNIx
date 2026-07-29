@@ -89,6 +89,7 @@ in
         "neovim"
         "node"
         "ocrmypdf"
+        "opencode"
         "openconnect"
         "openssl@3"
         "pandoc"
