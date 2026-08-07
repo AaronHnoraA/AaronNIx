@@ -12,12 +12,8 @@ let
 in
 {
   homebrew = {
-    taps = [
-      "d12frosted/emacs-plus"
-    ];
-
     casks = [
-      "emacs-plus-app@master"
+      "emacs-app"
     ];
   };
 

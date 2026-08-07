@@ -4,7 +4,7 @@
 
 ## 核心规则
 
-- 不再安装或更新 `emacs-plus-app@master`。
+- 使用 Homebrew 官方 `emacs-app`，不再安装或更新 `emacs-plus-app@master`。
 - 不再使用 `emacs-overlay`。
 - 不再维护 Homebrew protected formula/cask 名单。
 - `daily`、`controlled-full` 是兼容别名，最终都调用 `full-update`。
