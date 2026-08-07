@@ -185,7 +185,7 @@
         {app = "/Applications/MarginNote 4.app";}
         {app = "/Applications/Zotero.app";}
         {app = "/System/Applications/Music.app";}
-        {app = "/Applications/Joplin.app";}
+        {app = "/Applications/Noema.app";}
         ];           # 固定在 Dock 里的应用列表
         tilesize = 100;                   # Dock 图标大小
         wvous-bl-corner = 1;             # 热角（左下角）动作
