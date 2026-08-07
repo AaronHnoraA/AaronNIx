@@ -11,11 +11,9 @@ let
   repoUrl = "https://github.com/AaronHnoraA/AaronEmacs.git";
 in
 {
-  homebrew = {
-    casks = [
-      "emacs-app"
-    ];
-  };
+  # Emacs is managed outside nix-darwin until an Emacs 31 pre-built cask is
+  # available.  Do not declare a cask/formula here: the current stable cask is
+  # Emacs 30, while the Emacs 31 formula compiles from source.
 
   system.activationScripts.cloneEmacsConfig.text = ''
     target_dir=${lib.escapeShellArg targetDir}

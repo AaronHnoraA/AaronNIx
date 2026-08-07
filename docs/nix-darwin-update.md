@@ -4,8 +4,8 @@
 
 ## 核心规则
 
-- 使用 Homebrew 官方 `emacs-app`，不再安装或更新 `emacs-plus-app@master`。
-- 不再使用 `emacs-overlay`。
+- Emacs 使用 `/Applications/Emacs.app` 中现有的 31 预构建版（含 xwidgets）。
+- 当前不由 nix-darwin 声明 Emacs；待上游提供 Emacs 31 预构建 cask 后，再由 Homebrew 正常负责安装、注册和 CLI 链接。
 - 不再维护 Homebrew protected formula/cask 名单。
 - `daily`、`controlled-full` 是兼容别名，最终都调用 `full-update`。
 - 更新流程不会调用 `nvim --headless` 做 Neovim 插件更新。
